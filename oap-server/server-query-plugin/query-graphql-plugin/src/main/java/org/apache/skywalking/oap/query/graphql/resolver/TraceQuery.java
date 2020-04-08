@@ -23,16 +23,20 @@ import com.google.common.base.Strings;
 import java.io.IOException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.skywalking.oap.query.graphql.type.TraceQueryCondition;
-import org.apache.skywalking.oap.server.core.*;
-import org.apache.skywalking.oap.server.core.query.*;
-import org.apache.skywalking.oap.server.core.query.entity.*;
+import org.apache.skywalking.oap.server.core.Const;
+import org.apache.skywalking.oap.server.core.CoreModule;
+import org.apache.skywalking.oap.server.core.UnexpectedException;
+import org.apache.skywalking.oap.server.core.query.DurationUtils;
+import org.apache.skywalking.oap.server.core.query.TraceQueryService;
+import org.apache.skywalking.oap.server.core.query.entity.Pagination;
+import org.apache.skywalking.oap.server.core.query.entity.QueryOrder;
+import org.apache.skywalking.oap.server.core.query.entity.Trace;
+import org.apache.skywalking.oap.server.core.query.entity.TraceBrief;
+import org.apache.skywalking.oap.server.core.query.entity.TraceState;
 import org.apache.skywalking.oap.server.library.module.ModuleManager;
 
 import static java.util.Objects.nonNull;
 
-/**
- * @author peng-yongsheng
- */
 public class TraceQuery implements GraphQLQueryResolver {
 
     private final ModuleManager moduleManager;
@@ -57,8 +61,12 @@ public class TraceQuery implements GraphQLQueryResolver {
         if (!Strings.isNullOrEmpty(condition.getTraceId())) {
             traceId = condition.getTraceId();
         } else if (nonNull(condition.getQueryDuration())) {
-            startSecondTB = DurationUtils.INSTANCE.startTimeDurationToSecondTimeBucket(condition.getQueryDuration().getStep(), condition.getQueryDuration().getStart());
-            endSecondTB = DurationUtils.INSTANCE.endTimeDurationToSecondTimeBucket(condition.getQueryDuration().getStep(), condition.getQueryDuration().getEnd());
+            startSecondTB = DurationUtils.INSTANCE.startTimeDurationToSecondTimeBucket(condition.getQueryDuration()
+                                                                                                .getStep(), condition.getQueryDuration()
+                                                                                                                     .getStart());
+            endSecondTB = DurationUtils.INSTANCE.endTimeDurationToSecondTimeBucket(condition.getQueryDuration()
+                                                                                            .getStep(), condition.getQueryDuration()
+                                                                                                                 .getEnd());
         } else {
             throw new UnexpectedException("The condition must contains either queryDuration or traceId.");
         }
@@ -67,7 +75,7 @@ public class TraceQuery implements GraphQLQueryResolver {
         int maxDuration = condition.getMaxTraceDuration();
         String endpointName = condition.getEndpointName();
         int serviceId = StringUtils.isEmpty(condition.getServiceId()) ? 0 : Integer.parseInt(condition.getServiceId());
-        int endpointId = StringUtils.isEmpty(condition.getEndpointId()) ? 0 : Integer.parseInt(condition.getEndpointId());
+        String endpointId = condition.getEndpointId();
         int serviceInstanceId = StringUtils.isEmpty(condition.getServiceInstanceId()) ? 0 : Integer.parseInt(condition.getServiceInstanceId());
         TraceState traceState = condition.getTraceState();
         QueryOrder queryOrder = condition.getQueryOrder();

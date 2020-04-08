@@ -17,14 +17,14 @@
 
 package org.apache.skywalking.oap.server.core.analysis.metrics;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.skywalking.oap.server.core.Const;
-import org.apache.skywalking.oap.server.core.storage.type.StorageDataType;
+import org.apache.skywalking.oap.server.core.storage.type.StorageDataComplexObject;
 
-/**
- * @author peng-yongsheng
- */
-public class IntKeyLongValueHashMap extends HashMap<Integer, IntKeyLongValue> implements StorageDataType {
+public class IntKeyLongValueHashMap extends HashMap<Integer, IntKeyLongValue> implements StorageDataComplexObject {
 
     public IntKeyLongValueHashMap() {
         super();
@@ -39,7 +39,8 @@ public class IntKeyLongValueHashMap extends HashMap<Integer, IntKeyLongValue> im
         toObject(data);
     }
 
-    @Override public String toStorageData() {
+    @Override
+    public String toStorageData() {
         StringBuilder data = new StringBuilder();
 
         List<Map.Entry<Integer, IntKeyLongValue>> list = new ArrayList<>(this.entrySet());
@@ -54,7 +55,8 @@ public class IntKeyLongValueHashMap extends HashMap<Integer, IntKeyLongValue> im
         return data.toString();
     }
 
-    @Override public void toObject(String data) {
+    @Override
+    public void toObject(String data) {
         String[] keyValues = data.split(Const.ARRAY_PARSER_SPLIT);
         for (String keyValue : keyValues) {
             IntKeyLongValue value = new IntKeyLongValue();
@@ -63,8 +65,9 @@ public class IntKeyLongValueHashMap extends HashMap<Integer, IntKeyLongValue> im
         }
     }
 
-    @Override public void copyFrom(Object source) {
-        IntKeyLongValueHashMap intKeyLongValueHashMap = (IntKeyLongValueHashMap)source;
+    @Override
+    public void copyFrom(Object source) {
+        IntKeyLongValueHashMap intKeyLongValueHashMap = (IntKeyLongValueHashMap) source;
         intKeyLongValueHashMap.values().forEach(value -> {
             IntKeyLongValue newValue = new IntKeyLongValue();
             newValue.copyFrom(value);

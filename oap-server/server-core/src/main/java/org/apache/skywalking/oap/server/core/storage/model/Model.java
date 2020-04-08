@@ -23,7 +23,7 @@ import lombok.Getter;
 import org.apache.skywalking.oap.server.core.analysis.Downsampling;
 
 /**
- * @author peng-yongsheng
+ * The model definition of a logic entity.
  */
 @Getter
 public class Model {
@@ -33,11 +33,20 @@ public class Model {
     private final Downsampling downsampling;
     private final boolean deleteHistory;
     private final List<ModelColumn> columns;
+    private final List<ExtraQueryIndex> extraQueryIndices;
     private final int scopeId;
     private final boolean record;
 
-    public Model(String name, List<ModelColumn> columns, boolean capableOfTimeSeries, boolean deleteHistory, int scopeId, Downsampling downsampling, boolean record) {
+    public Model(String name,
+                 List<ModelColumn> columns,
+                 List<ExtraQueryIndex> extraQueryIndices,
+                 boolean capableOfTimeSeries,
+                 boolean deleteHistory,
+                 int scopeId,
+                 Downsampling downsampling,
+                 boolean record) {
         this.columns = columns;
+        this.extraQueryIndices = extraQueryIndices;
         this.capableOfTimeSeries = capableOfTimeSeries;
         this.downsampling = downsampling;
         this.deleteHistory = deleteHistory;

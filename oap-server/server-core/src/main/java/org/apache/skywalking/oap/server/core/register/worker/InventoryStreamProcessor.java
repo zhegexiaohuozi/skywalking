@@ -32,18 +32,28 @@ import org.apache.skywalking.oap.server.core.storage.IRegisterDAO;
 import org.apache.skywalking.oap.server.core.storage.StorageDAO;
 import org.apache.skywalking.oap.server.core.storage.StorageModule;
 import org.apache.skywalking.oap.server.core.storage.annotation.Storage;
-import org.apache.skywalking.oap.server.core.storage.model.IModelSetter;
+import org.apache.skywalking.oap.server.core.storage.model.INewModel;
 import org.apache.skywalking.oap.server.core.storage.model.Model;
 import org.apache.skywalking.oap.server.core.worker.IWorkerInstanceSetter;
 import org.apache.skywalking.oap.server.library.module.ModuleDefineHolder;
 
 /**
- * @author peng-yongsheng
+ * InventoryStreamProcessor represents the entrance and creator of the inventory register work flow.
+ *
+ * Method #in provides the major entrance for inventory streaming merge, eventually add or update the
+ * inventory data in the storage.
+ *
+ * Method #create creates the workers and work flow for every inventory.
  */
 public class InventoryStreamProcessor implements StreamProcessor<RegisterSource> {
-
+    /**
+     * Singleton instance.
+     */
     private static final InventoryStreamProcessor PROCESSOR = new InventoryStreamProcessor();
 
+    /**
+     * Worker table hosts all entrance workers.
+     */
     private Map<Class<? extends RegisterSource>, RegisterDistinctWorker> entryWorkers = new HashMap<>();
 
     public static InventoryStreamProcessor getInstance() {
@@ -54,9 +64,16 @@ public class InventoryStreamProcessor implements StreamProcessor<RegisterSource>
         entryWorkers.get(registerSource.getClass()).in(registerSource);
     }
 
+    /**
+     * Create the workers and work flow for every inventory.
+     *
+     * @param moduleDefineHolder pointer of the module define.
+     * @param stream             definition of the inventory class.
+     * @param inventoryClass     data type of the inventory.
+     */
     @SuppressWarnings("unchecked")
     public void create(ModuleDefineHolder moduleDefineHolder, Stream stream,
-        Class<? extends RegisterSource> inventoryClass) {
+                       Class<? extends RegisterSource> inventoryClass) {
         StorageDAO storageDAO = moduleDefineHolder.find(StorageModule.NAME).provider().getService(StorageDAO.class);
         IRegisterDAO registerDAO;
         try {
@@ -65,13 +82,18 @@ public class InventoryStreamProcessor implements StreamProcessor<RegisterSource>
             throw new UnexpectedException("Create " + stream.builder().getSimpleName() + " register DAO failure.", e);
         }
 
-        IModelSetter modelSetter = moduleDefineHolder.find(CoreModule.NAME).provider().getService(IModelSetter.class);
-        Model model = modelSetter.putIfAbsent(inventoryClass, stream.scopeId(), new Storage(stream.name(), false, false, Downsampling.None), false);
+        INewModel modelSetter = moduleDefineHolder.find(CoreModule.NAME).provider().getService(INewModel.class);
+        Model model = modelSetter.add(
+            inventoryClass, stream.scopeId(), new Storage(stream.name(), false, false, Downsampling.None), false);
 
-        RegisterPersistentWorker persistentWorker = new RegisterPersistentWorker(moduleDefineHolder, model.getName(), registerDAO, stream.scopeId());
+        RegisterPersistentWorker persistentWorker = new RegisterPersistentWorker(
+            moduleDefineHolder, model.getName(), registerDAO, stream
+            .scopeId());
 
         String remoteReceiverWorkerName = stream.name() + "_rec";
-        IWorkerInstanceSetter workerInstanceSetter = moduleDefineHolder.find(CoreModule.NAME).provider().getService(IWorkerInstanceSetter.class);
+        IWorkerInstanceSetter workerInstanceSetter = moduleDefineHolder.find(CoreModule.NAME)
+                                                                       .provider()
+                                                                       .getService(IWorkerInstanceSetter.class);
         workerInstanceSetter.put(remoteReceiverWorkerName, persistentWorker, inventoryClass);
 
         RegisterRemoteWorker remoteWorker = new RegisterRemoteWorker(moduleDefineHolder, remoteReceiverWorkerName);

@@ -18,22 +18,26 @@
 
 package org.apache.skywalking.oap.server.core.query;
 
-import java.util.*;
-import org.apache.skywalking.oap.server.core.*;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import org.apache.skywalking.oap.server.core.Const;
+import org.apache.skywalking.oap.server.core.CoreModule;
 import org.apache.skywalking.oap.server.core.cache.ServiceInventoryCache;
 import org.apache.skywalking.oap.server.core.config.IComponentLibraryCatalogService;
-import org.apache.skywalking.oap.server.core.query.entity.*;
+import org.apache.skywalking.oap.server.core.query.entity.Call;
+import org.apache.skywalking.oap.server.core.query.entity.Node;
+import org.apache.skywalking.oap.server.core.query.entity.Topology;
 import org.apache.skywalking.oap.server.core.register.ServiceInventory;
 import org.apache.skywalking.oap.server.core.source.DetectPoint;
 import org.apache.skywalking.oap.server.library.module.ModuleManager;
 import org.apache.skywalking.oap.server.library.util.BooleanUtils;
-import org.slf4j.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.isNull;
 
-/**
- * @author peng-yongsheng
- */
 class TopologyBuilder {
 
     private static final Logger logger = LoggerFactory.getLogger(TopologyBuilder.class);
@@ -42,21 +46,23 @@ class TopologyBuilder {
     private final IComponentLibraryCatalogService componentLibraryCatalogService;
 
     TopologyBuilder(ModuleManager moduleManager) {
-        this.serviceInventoryCache = moduleManager.find(CoreModule.NAME).provider().getService(ServiceInventoryCache.class);
-        this.componentLibraryCatalogService = moduleManager.find(CoreModule.NAME).provider().getService(IComponentLibraryCatalogService.class);
+        this.serviceInventoryCache = moduleManager.find(CoreModule.NAME)
+                                                  .provider()
+                                                  .getService(ServiceInventoryCache.class);
+        this.componentLibraryCatalogService = moduleManager.find(CoreModule.NAME)
+                                                           .provider()
+                                                           .getService(IComponentLibraryCatalogService.class);
     }
 
     Topology build(List<Call.CallDetail> serviceRelationClientCalls, List<Call.CallDetail> serviceRelationServerCalls) {
-        filterZeroSourceOrTargetReference(serviceRelationClientCalls);
-        filterZeroSourceOrTargetReference(serviceRelationServerCalls);
 
         Map<Integer, Node> nodes = new HashMap<>();
         List<Call> calls = new LinkedList<>();
         HashMap<String, Call> callMap = new HashMap<>();
 
         for (Call.CallDetail clientCall : serviceRelationClientCalls) {
-            ServiceInventory source = serviceInventoryCache.get(clientCall.getSource());
-            ServiceInventory target = serviceInventoryCache.get(clientCall.getTarget());
+            ServiceInventory source = serviceInventoryCache.get(Integer.parseInt(clientCall.getSource()));
+            ServiceInventory target = serviceInventoryCache.get(Integer.parseInt(clientCall.getTarget()));
 
             if (isNull(source) || isNull(target)) {
                 continue;
@@ -73,7 +79,9 @@ class TopologyBuilder {
             if (!nodes.containsKey(target.getSequence())) {
                 nodes.put(target.getSequence(), buildNode(target));
                 if (BooleanUtils.valueToBoolean(target.getIsAddress())) {
-                    nodes.get(target.getSequence()).setType(componentLibraryCatalogService.getServerNameBasedOnComponent(clientCall.getComponentId()));
+                    nodes.get(target.getSequence())
+                         .setType(
+                             componentLibraryCatalogService.getServerNameBasedOnComponent(clientCall.getComponentId()));
                 }
             }
 
@@ -97,8 +105,8 @@ class TopologyBuilder {
         }
 
         for (Call.CallDetail serverCall : serviceRelationServerCalls) {
-            ServiceInventory source = serviceInventoryCache.get(serverCall.getSource());
-            ServiceInventory target = serviceInventoryCache.get(serverCall.getTarget());
+            ServiceInventory source = serviceInventoryCache.get(Integer.parseInt(serverCall.getSource()));
+            ServiceInventory target = serviceInventoryCache.get(Integer.parseInt(serverCall.getTarget()));
 
             if (isNull(source) || isNull(target)) {
                 continue;
@@ -107,7 +115,7 @@ class TopologyBuilder {
             if (source.getSequence() == Const.USER_SERVICE_ID) {
                 if (!nodes.containsKey(source.getSequence())) {
                     Node visualUserNode = new Node();
-                    visualUserNode.setId(source.getSequence());
+                    visualUserNode.setId(String.valueOf(source.getSequence()));
                     visualUserNode.setName(Const.USER_CODE);
                     visualUserNode.setType(Const.USER_CODE.toUpperCase());
                     visualUserNode.setReal(false);
@@ -118,9 +126,10 @@ class TopologyBuilder {
             if (BooleanUtils.valueToBoolean(source.getIsAddress())) {
                 if (!nodes.containsKey(source.getSequence())) {
                     Node conjecturalNode = new Node();
-                    conjecturalNode.setId(source.getSequence());
+                    conjecturalNode.setId(String.valueOf(source.getSequence()));
                     conjecturalNode.setName(source.getName());
-                    conjecturalNode.setType(componentLibraryCatalogService.getServerNameBasedOnComponent(serverCall.getComponentId()));
+                    conjecturalNode.setType(
+                        componentLibraryCatalogService.getServerNameBasedOnComponent(serverCall.getComponentId()));
                     conjecturalNode.setReal(true);
                     nodes.put(source.getSequence(), conjecturalNode);
                 }
@@ -154,7 +163,8 @@ class TopologyBuilder {
             }
 
             if (nodes.containsKey(target.getSequence())) {
-                nodes.get(target.getSequence()).setType(componentLibraryCatalogService.getComponentName(serverCall.getComponentId()));
+                nodes.get(target.getSequence())
+                     .setType(componentLibraryCatalogService.getComponentName(serverCall.getComponentId()));
             }
         }
 
@@ -166,7 +176,7 @@ class TopologyBuilder {
 
     private Node buildNode(ServiceInventory serviceInventory) {
         Node serviceNode = new Node();
-        serviceNode.setId(serviceInventory.getSequence());
+        serviceNode.setId(String.valueOf(serviceInventory.getSequence()));
         serviceNode.setName(serviceInventory.getName());
         if (BooleanUtils.valueToBoolean(serviceInventory.getIsAddress())) {
             serviceNode.setReal(false);
@@ -174,14 +184,5 @@ class TopologyBuilder {
             serviceNode.setReal(true);
         }
         return serviceNode;
-    }
-
-    private void filterZeroSourceOrTargetReference(List<Call.CallDetail> serviceRelationClientCalls) {
-        for (int i = serviceRelationClientCalls.size() - 1; i >= 0; i--) {
-            Call.CallDetail call = serviceRelationClientCalls.get(i);
-            if (call.getSource() == 0 || call.getTarget() == 0) {
-                serviceRelationClientCalls.remove(i);
-            }
-        }
     }
 }

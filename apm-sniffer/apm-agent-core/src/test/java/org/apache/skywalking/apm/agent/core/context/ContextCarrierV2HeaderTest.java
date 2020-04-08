@@ -20,7 +20,6 @@ package org.apache.skywalking.apm.agent.core.context;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.skywalking.apm.agent.core.conf.Config;
 import org.apache.skywalking.apm.agent.core.context.ids.DistributedTraceId;
 import org.apache.skywalking.apm.agent.core.context.ids.ID;
 import org.apache.skywalking.apm.agent.core.context.ids.PropagatedTraceId;
@@ -28,30 +27,6 @@ import org.junit.Assert;
 import org.junit.Test;
 
 public class ContextCarrierV2HeaderTest {
-    @Test
-    public void testCompatibleHeaderKeys() {
-        Config.Agent.ACTIVE_V1_HEADER = true;
-        ContextCarrier contextCarrier = new ContextCarrier();
-        CarrierItem next = contextCarrier.items();
-        boolean hasSW3 = false;
-        boolean hasSW6 = false;
-        try {
-            while (next.hasNext()) {
-                next = next.next();
-                if (next.getHeadKey().equals("sw3")) {
-                    hasSW3 = true;
-                } else if (next.getHeadKey().equals("sw6")) {
-                    hasSW6 = true;
-                } else {
-                    Assert.fail("unexpected key");
-                }
-            }
-        } finally {
-            Config.Agent.ACTIVE_V1_HEADER = false;
-        }
-        Assert.assertTrue(hasSW3);
-        Assert.assertTrue(hasSW6);
-    }
 
     @Test
     public void testDeserializeV2Header() {
@@ -59,31 +34,13 @@ public class ContextCarrierV2HeaderTest {
         CarrierItem next = contextCarrier.items();
         while (next.hasNext()) {
             next = next.next();
-            if (next.getHeadKey().equals("sw3")) {
-            } else if (next.getHeadKey().equals("sw6")) {
+            if (next.getHeadKey().equals(SW6CarrierItem.HEADER_NAME)) {
                 next.setHeadValue("1-My40LjU=-MS4yLjM=-4-1-1-IzEyNy4wLjAuMTo4MDgw--");
+            } else if (next.getHeadKey().equals(SW8CorrelationCarrierItem.HEADER_NAME)) {
+                next.setHeadValue("dGVzdA==:dHJ1ZQ==");
             } else {
-                Assert.fail("unexpected key");
+                throw new IllegalArgumentException("Unknown Header: " + next.getHeadKey());
             }
-        }
-
-        Assert.assertTrue(contextCarrier.isValid());
-
-        Config.Agent.ACTIVE_V1_HEADER = true;
-        try {
-            contextCarrier = new ContextCarrier();
-            next = contextCarrier.items();
-            while (next.hasNext()) {
-                next = next.next();
-                if (next.getHeadKey().equals("sw3")) {
-                    next.setHeadValue("1.2343.234234234|1|1|1|#127.0.0.1:8080|#/portal/|#/testEntrySpan|1.2343.234234234");
-                } else if (next.getHeadKey().equals("sw6")) {
-                } else {
-                    Assert.fail("unexpected key");
-                }
-            }
-        } finally {
-            Config.Agent.ACTIVE_V1_HEADER = false;
         }
 
         Assert.assertTrue(contextCarrier.isValid());
@@ -91,7 +48,7 @@ public class ContextCarrierV2HeaderTest {
 
     @Test
     public void testSerializeV2Header() {
-        List<DistributedTraceId> distributedTraceIds = new ArrayList<DistributedTraceId>();
+        List<DistributedTraceId> distributedTraceIds = new ArrayList<>();
         distributedTraceIds.add(new PropagatedTraceId("3.4.5"));
 
         ContextCarrier contextCarrier = new ContextCarrier();
@@ -102,42 +59,42 @@ public class ContextCarrierV2HeaderTest {
         contextCarrier.setParentServiceInstanceId(1);
         contextCarrier.setPeerHost("127.0.0.1:8080");
         contextCarrier.setEntryEndpointName("/portal");
-        contextCarrier.setParentEndpointId(123);
+        contextCarrier.setParentEndpointName("/app");
+
+        contextCarrier.getCorrelationContext().put("test", "true");
 
         CarrierItem next = contextCarrier.items();
         while (next.hasNext()) {
             next = next.next();
-            if (next.getHeadKey().equals("sw3")) {
-                Assert.assertEquals("", next.getHeadValue());
-            } else if (next.getHeadKey().equals("sw6")) {
+            /*
+             * sampleFlag-traceId-segmentId-spanId-parentAppInstId-entryAppInstId-peerHost-entryEndpoint-parentEndpoint
+             *
+             * "1-3.4.5-1.2.3-4-1-1-#127.0.0.1:8080-#/portal-123"
+             */
+            if (next.getHeadKey().equals(SW6CarrierItem.HEADER_NAME)) {
+                Assert.assertEquals("1-My40LjU=-MS4yLjM=-4-1-1-IzEyNy4wLjAuMTo4MDgw-Iy9wb3J0YWw=-Iy9hcHA=", next.getHeadValue());
+            } else if (next.getHeadKey().equals(SW8CorrelationCarrierItem.HEADER_NAME)) {
                 /**
-                 * sampleFlag-traceId-segmentId-spanId-parentAppInstId-entryAppInstId-peerHost-entryEndpoint-parentEndpoint
+                 * customKey:customValue
                  *
-                 * "1-3.4.5-1.2.3-4-1-1-#127.0.0.1:8080-#/portal-123"
+                 * "test:true"
                  */
-                Assert.assertEquals("1-My40LjU=-MS4yLjM=-4-1-1-IzEyNy4wLjAuMTo4MDgw-Iy9wb3J0YWw=-MTIz", next.getHeadValue());
+                Assert.assertEquals("dGVzdA==:dHJ1ZQ==", next.getHeadValue());
             } else {
-                Assert.fail("unexpected key");
+                throw new IllegalArgumentException("Unknown Header: " + next.getHeadKey());
             }
         }
 
-        Config.Agent.ACTIVE_V1_HEADER = true;
-        try {
-            next = contextCarrier.items();
-            while (next.hasNext()) {
-                next = next.next();
-                if (next.getHeadKey().equals("sw3")) {
-                    Assert.assertEquals("1.2.3|4|1|1|#127.0.0.1:8080|#/portal|123|3.4.5", next.getHeadValue());
-                } else if (next.getHeadKey().equals("sw6")) {
-                    //TODO, no BASE64
-                    Assert.assertEquals("1-My40LjU=-MS4yLjM=-4-1-1-IzEyNy4wLjAuMTo4MDgw-Iy9wb3J0YWw=-MTIz", next.getHeadValue());
-                } else {
-                    Assert.fail("unexpected key");
-                }
+        next = contextCarrier.items();
+        while (next.hasNext()) {
+            next = next.next();
+            if (next.getHeadKey().equals(SW6CarrierItem.HEADER_NAME)) {
+                Assert.assertEquals("1-My40LjU=-MS4yLjM=-4-1-1-IzEyNy4wLjAuMTo4MDgw-Iy9wb3J0YWw=-Iy9hcHA=", next.getHeadValue());
+            } else if (next.getHeadKey().equals(SW8CorrelationCarrierItem.HEADER_NAME)) {
+                Assert.assertEquals("dGVzdA==:dHJ1ZQ==", next.getHeadValue());
+            } else {
+                throw new IllegalArgumentException("Unknown Header: " + next.getHeadKey());
             }
-
-        } finally {
-            Config.Agent.ACTIVE_V1_HEADER = false;
         }
 
         Assert.assertTrue(contextCarrier.isValid());
@@ -145,7 +102,7 @@ public class ContextCarrierV2HeaderTest {
 
     @Test
     public void testV2HeaderAccurate() {
-        List<DistributedTraceId> distributedTraceIds = new ArrayList<DistributedTraceId>();
+        List<DistributedTraceId> distributedTraceIds = new ArrayList<>();
         distributedTraceIds.add(new PropagatedTraceId("3.4.5"));
 
         ContextCarrier contextCarrier = new ContextCarrier();
@@ -156,18 +113,21 @@ public class ContextCarrierV2HeaderTest {
         contextCarrier.setParentServiceInstanceId(1);
         contextCarrier.setPeerHost("127.0.0.1:8080");
         contextCarrier.setEntryEndpointName("/portal");
-        contextCarrier.setParentEndpointId(123);
+        contextCarrier.setParentEndpointName("/app");
+
+        contextCarrier.getCorrelationContext().put("test", "true");
 
         CarrierItem next = contextCarrier.items();
-        String headerValue = null;
+        String sw6HeaderValue = null;
+        String correlationHeaderValue = null;
         while (next.hasNext()) {
             next = next.next();
-            if (next.getHeadKey().equals("sw3")) {
-                Assert.assertEquals("", next.getHeadValue());
-            } else if (next.getHeadKey().equals("sw6")) {
-                headerValue = next.getHeadValue();
+            if (next.getHeadKey().equals(SW6CarrierItem.HEADER_NAME)) {
+                sw6HeaderValue = next.getHeadValue();
+            } else if (next.getHeadKey().equals(SW8CorrelationCarrierItem.HEADER_NAME)) {
+                correlationHeaderValue = next.getHeadValue();
             } else {
-                Assert.fail("unexpected key");
+                throw new IllegalArgumentException("Unknown Header: " + next.getHeadKey());
             }
         }
 
@@ -175,11 +135,12 @@ public class ContextCarrierV2HeaderTest {
         next = contextCarrier2.items();
         while (next.hasNext()) {
             next = next.next();
-            if (next.getHeadKey().equals("sw3")) {
-            } else if (next.getHeadKey().equals("sw6")) {
-                next.setHeadValue(headerValue);
+            if (next.getHeadKey().equals(SW6CarrierItem.HEADER_NAME)) {
+                next.setHeadValue(sw6HeaderValue);
+            } else if (next.getHeadKey().equals(SW8CorrelationCarrierItem.HEADER_NAME)) {
+                next.setHeadValue(correlationHeaderValue);
             } else {
-                Assert.fail("unexpected key");
+                throw new IllegalArgumentException("Unknown Header: " + next.getHeadKey());
             }
         }
 
@@ -191,5 +152,6 @@ public class ContextCarrierV2HeaderTest {
         Assert.assertEquals(contextCarrier.getEntryEndpointName(), contextCarrier2.getEntryEndpointName());
         Assert.assertEquals(contextCarrier.getEntryServiceInstanceId(), contextCarrier2.getEntryServiceInstanceId());
         Assert.assertEquals(contextCarrier.getParentServiceInstanceId(), contextCarrier2.getParentServiceInstanceId());
+        Assert.assertEquals(contextCarrier.getCorrelationContext(), contextCarrier2.getCorrelationContext());
     }
 }

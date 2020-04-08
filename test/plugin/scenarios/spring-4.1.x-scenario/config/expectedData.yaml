@@ -14,18 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 registryItems:
-  applications:
+  services:
     - {spring-4.1.x-scenario: 2}
   instances:
     - {spring-4.1.x-scenario: 1}
-  operationNames:
-    - spring-4.1.x-scenario: ['{DELETE}/delete/{id}', /case/resttemplate, '{GET}/get/{id}',
-                              /spring-4.1.x-scenario/delete/1, '{POST}/create/', /healthCheck, /case/spring3,
-                              /spring-4.1.x-scenario/case/spring3/, /spring-4.1.x-scenario/update/1, '{PUT}/update/{id}',
-                              /spring-4.1.x-scenario/create/, /spring-4.1.x-scenario/get/1]
   heartbeat: []
 segmentItems:
-  - applicationCode: spring-4.1.x-scenario
+  - serviceName: spring-4.1.x-scenario
     segmentSize: ge 7
     segments:
       - segmentId: not null

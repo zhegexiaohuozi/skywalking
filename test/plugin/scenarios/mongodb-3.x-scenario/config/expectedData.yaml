@@ -15,17 +15,14 @@
 # limitations under the License.
 
 registryItems:
-  applications:
+  services:
     - {mongodb-3.x-scenario: nq 0}
   instances:
     - {mongodb-3.x-scenario: 1}
-  operationNames:
-    - mongodb-3.x-scenario: [/mongodb-case/case/mongodb, MongoDB/DropDatabaseOperation, MongoDB/FindOperation,
-                             MongoDB/CreateCollectionOperation, MongoDB/MixedBulkWriteOperation]
   heartbeat: []
 
 segmentItems:
-- applicationCode: mongodb-3.x-scenario
+- serviceName: mongodb-3.x-scenario
   segmentSize: ge 2
   segments:
   - segmentId: not null

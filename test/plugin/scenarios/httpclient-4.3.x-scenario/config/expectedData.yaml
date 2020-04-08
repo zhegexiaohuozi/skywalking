@@ -14,17 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 registryItems:
-  applications:
+  services:
     - {httpclient-4.3.x-scenario: 2}
   instances:
     - {httpclient-4.3.x-scenario: 1}
-  operationNames:
-    - httpclient-4.3.x-scenario: [/httpclient-4.3.x-scenario/case/httpclient,
-                                  /httpclient-4.3.x-scenario/healthCheck,
-                                  /httpclient-4.3.x-scenario/case/context-propagate]
   heartbeat: []
 segmentItems:
-  - applicationCode: httpclient-4.3.x-scenario
+  - serviceName: httpclient-4.3.x-scenario
     segmentSize: ge 3
     segments:
       - segmentId: not null

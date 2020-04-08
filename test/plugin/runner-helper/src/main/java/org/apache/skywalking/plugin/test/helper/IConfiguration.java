@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.skywalking.plugin.test.helper;
 
 import org.apache.skywalking.plugin.test.helper.vo.CaseConfiguration;
@@ -38,11 +39,15 @@ public interface IConfiguration {
 
     String startScript();
 
+    String catalinaOpts();
+
     String entryService();
 
     String dockerImageName();
 
     String dockerContainerName();
+
+    String dockerNetworkName();
 
     String dockerImageVersion();
 

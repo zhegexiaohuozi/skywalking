@@ -15,15 +15,13 @@
 # limitations under the License.
 
 registryItems:
-  applications:
+  services:
     - {spring-async-scenario: 2}
   instances:
     - {spring-async-scenario: 1}
-  operationNames:
-    - spring-async-scenario: [/spring-async-scenario/case/asyncVisit, /spring-async-scenario/case/spring-async]
   heartbeat: []
 segmentItems:
-  - applicationCode: spring-async-scenario
+  - serviceName: spring-async-scenario
     segmentSize: gt 5
     segments:
       - segmentId: not null

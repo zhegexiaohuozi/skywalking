@@ -21,35 +21,36 @@ package org.apache.skywalking.aop.server.receiver.jaeger;
 import com.google.gson.JsonObject;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
-import io.jaegertracing.api_v2.*;
+import io.jaegertracing.api_v2.Collector;
+import io.jaegertracing.api_v2.CollectorServiceGrpc;
+import io.jaegertracing.api_v2.Model;
 import java.time.Instant;
 import java.util.Base64;
 import org.apache.skywalking.apm.util.StringUtil;
 import org.apache.skywalking.oap.server.core.Const;
 import org.apache.skywalking.oap.server.core.analysis.TimeBucket;
-import org.apache.skywalking.oap.server.core.source.*;
-import org.apache.skywalking.oap.server.library.util.*;
+import org.apache.skywalking.oap.server.core.analysis.manual.endpoint.EndpointTraffic;
+import org.apache.skywalking.oap.server.core.source.DetectPoint;
+import org.apache.skywalking.oap.server.core.source.SourceReceiver;
+import org.apache.skywalking.oap.server.library.util.BooleanUtils;
 import org.apache.skywalking.oap.server.receiver.sharing.server.CoreRegisterLinker;
 import org.apache.skywalking.oap.server.storage.plugin.jaeger.JaegerSpan;
-import org.slf4j.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/**
- * @author wusheng
- */
 public class JaegerGRPCHandler extends CollectorServiceGrpc.CollectorServiceImplBase {
     private static final Logger logger = LoggerFactory.getLogger(JaegerGRPCHandler.class);
 
     private SourceReceiver receiver;
     private JaegerReceiverConfig config;
 
-    public JaegerGRPCHandler(SourceReceiver receiver,
-        JaegerReceiverConfig config) {
+    public JaegerGRPCHandler(SourceReceiver receiver, JaegerReceiverConfig config) {
         this.receiver = receiver;
         this.config = config;
     }
 
     public void postSpans(Collector.PostSpansRequest request,
-        StreamObserver<Collector.PostSpansResponse> responseObserver) {
+                          StreamObserver<Collector.PostSpansResponse> responseObserver) {
 
         request.getBatch().getSpansList().forEach(span -> {
             try {
@@ -98,11 +99,13 @@ public class JaegerGRPCHandler extends CollectorServiceGrpc.CollectorServiceImpl
                 }
 
                 long duration = span.getDuration().getNanos() / 1_000_000;
-                jaegerSpan.setStartTime(Instant.ofEpochSecond(span.getStartTime().getSeconds(), span.getStartTime().getNanos()).toEpochMilli());
+                jaegerSpan.setStartTime(Instant.ofEpochSecond(span.getStartTime().getSeconds(), span.getStartTime()
+                                                                                                    .getNanos())
+                                               .toEpochMilli());
                 long timeBucket = TimeBucket.getRecordTimeBucket(jaegerSpan.getStartTime());
                 jaegerSpan.setTimeBucket(timeBucket);
                 jaegerSpan.setEndTime(jaegerSpan.getStartTime() + duration);
-                jaegerSpan.setLatency((int)duration);
+                jaegerSpan.setLatency((int) duration);
                 jaegerSpan.setDataBinary(span.toByteArray());
                 jaegerSpan.setEndpointName(span.getOperationName());
 
@@ -117,11 +120,8 @@ public class JaegerGRPCHandler extends CollectorServiceGrpc.CollectorServiceImpl
                         if ("server".equals(kind) || "consumer".equals(kind)) {
                             String endpointName = span.getOperationName();
                             jaegerSpan.setEndpointName(endpointName);
-                            int endpointId = CoreRegisterLinker.getEndpointInventoryCache().getEndpointId(finalServiceId, endpointName,
-                                DetectPoint.SERVER.ordinal());
-                            if (endpointId != Const.NONE) {
-                                CoreRegisterLinker.getEndpointInventoryRegister().getOrCreate(finalServiceId, endpointName, DetectPoint.SERVER);
-                            }
+                            jaegerSpan.setEndpointId(
+                                EndpointTraffic.buildId(finalServiceId, endpointName, DetectPoint.SERVER));
                         }
                     }
                 });

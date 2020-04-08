@@ -18,11 +18,9 @@
 
 package org.apache.skywalking.oap.server.core.query.entity;
 
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
 
-/**
- * @author wusheng
- */
 @Setter
 @Getter
 public class Log {
@@ -30,8 +28,8 @@ public class Log {
     private int serviceId;
     private String serviceInstanceName;
     private int serviceInstanceId;
+    private String endpointId;
     private String endpointName;
-    private int endpointId;
     private String traceId;
     private String timestamp;
     private boolean isError;

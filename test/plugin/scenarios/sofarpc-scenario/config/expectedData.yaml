@@ -15,16 +15,13 @@
 # limitations under the License.
 
 registryItems:
-  applications:
+  services:
     - {sofarpc-scenario: 2}
   instances:
     - {sofarpc-scenario: 1}
-  operationNames:
-    - sofarpc-scenario: [org.apache.skywalking.apm.testcase.sofarpc.interfaces.SofaRpcDemoService.hello(java.lang.String),
-                         /sofarpc-scenario/case/sofarpc]
   heartbeat: []
 segmentItems:
-  - applicationCode: sofarpc-scenario
+  - serviceName: sofarpc-scenario
     segmentSize: gt 2
     segments:
       - segmentId: not null

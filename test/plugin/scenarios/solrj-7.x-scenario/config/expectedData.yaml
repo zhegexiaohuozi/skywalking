@@ -14,17 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 registryItems:
-  applications:
+  services:
     - {solrj-7.x-scenario: nq 0}
   instances:
     - {solrj-7.x-scenario: nq 0}
-  operationNames:
-    - solrj-7.x-scenario: [/solrj-scenario/case/solrj, solrJ/mycore/update/COMMIT, solrJ/mycore/update/DELETE_BY_IDS,
-                           solrJ/mycore/select, solrJ/mycore/update/DELETE_BY_QUERY, solrJ/mycore/get,
-                           solrJ/mycore/update/OPTIMIZE, solrJ/mycore/update/ADD]
   heartbeat: []
 segmentItems:
-  - applicationCode: solrj-7.x-scenario
+  - serviceName: solrj-7.x-scenario
     segmentSize: gt 1
     segments:
       - segmentId: not null

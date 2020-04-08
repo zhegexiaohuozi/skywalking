@@ -16,24 +16,13 @@
  *
  */
 
-
 package org.apache.skywalking.apm.agent.core.dictionary;
 
-/**
- * @author wusheng
- */
 public class DictionaryManager {
     /**
      * @return {@link NetworkAddressDictionary} to find application id for application code and network address.
      */
     public static NetworkAddressDictionary findNetworkAddressSection() {
         return NetworkAddressDictionary.INSTANCE;
-    }
-
-    /**
-     * @return {@link EndpointNameDictionary} to find service id.
-     */
-    public static EndpointNameDictionary findEndpointSection() {
-        return EndpointNameDictionary.INSTANCE;
     }
 }

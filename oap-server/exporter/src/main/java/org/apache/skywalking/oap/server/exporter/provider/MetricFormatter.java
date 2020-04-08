@@ -18,19 +18,17 @@
 
 package org.apache.skywalking.oap.server.exporter.provider;
 
-import lombok.*;
-import org.apache.skywalking.oap.server.core.analysis.metrics.*;
-import org.apache.skywalking.oap.server.core.cache.*;
+import lombok.Setter;
+import org.apache.skywalking.oap.server.core.analysis.manual.endpoint.EndpointTraffic;
+import org.apache.skywalking.oap.server.core.analysis.metrics.MetricsMetaInfo;
+import org.apache.skywalking.oap.server.core.cache.ServiceInstanceInventoryCache;
+import org.apache.skywalking.oap.server.core.cache.ServiceInventoryCache;
 import org.apache.skywalking.oap.server.core.source.DefaultScopeDefine;
 
-/**
- * @author wusheng
- */
 @Setter
 public class MetricFormatter {
     private ServiceInventoryCache serviceInventoryCache;
     private ServiceInstanceInventoryCache serviceInstanceInventoryCache;
-    private EndpointInventoryCache endpointInventoryCache;
 
     protected String getEntityName(MetricsMetaInfo meta) {
         int scope = meta.getScope();
@@ -41,8 +39,7 @@ public class MetricFormatter {
             int entityId = Integer.valueOf(meta.getId());
             return serviceInstanceInventoryCache.get(entityId).getName();
         } else if (DefaultScopeDefine.inEndpointCatalog(scope)) {
-            int entityId = Integer.valueOf(meta.getId());
-            return endpointInventoryCache.get(entityId).getName();
+            return EndpointTraffic.splitID(meta.getId()).getEndpointName();
         } else if (scope == DefaultScopeDefine.ALL) {
             return "";
         } else {

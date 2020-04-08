@@ -19,19 +19,18 @@
 package org.apache.skywalking.oap.server.core.analysis.metrics;
 
 import java.util.Objects;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.skywalking.oap.server.core.Const;
 import org.apache.skywalking.oap.server.core.remote.grpc.proto.IntKeyLongValuePair;
-import org.apache.skywalking.oap.server.core.storage.type.StorageDataType;
+import org.apache.skywalking.oap.server.core.storage.type.StorageDataComplexObject;
 
 /**
  * IntKeyLongValue is a common bean, with key in Int and value in Long
- *
- * @author wusheng, peng-yongsheng
  */
 @Setter
 @Getter
-public class IntKeyLongValue implements Comparable<IntKeyLongValue>, StorageDataType {
+public class IntKeyLongValue implements Comparable<IntKeyLongValue>, StorageDataComplexObject {
     private int key;
     private long value;
 
@@ -52,16 +51,18 @@ public class IntKeyLongValue implements Comparable<IntKeyLongValue>, StorageData
         return key - o.key;
     }
 
-    @Override public boolean equals(Object o) {
+    @Override
+    public boolean equals(Object o) {
         if (this == o)
             return true;
         if (o == null || getClass() != o.getClass())
             return false;
-        IntKeyLongValue value = (IntKeyLongValue)o;
+        IntKeyLongValue value = (IntKeyLongValue) o;
         return key == value.key;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
         return Objects.hash(key);
     }
 
@@ -74,18 +75,21 @@ public class IntKeyLongValue implements Comparable<IntKeyLongValue>, StorageData
         this.value = pair.getValue();
     }
 
-    @Override public String toStorageData() {
+    @Override
+    public String toStorageData() {
         return key + Const.KEY_VALUE_SPLIT + value;
     }
 
-    @Override public void toObject(String data) {
+    @Override
+    public void toObject(String data) {
         String[] keyValue = data.split(Const.KEY_VALUE_SPLIT);
-        this.key = Integer.valueOf(keyValue[0]);
-        this.value = Long.valueOf(keyValue[1]);
+        this.key = Integer.parseInt(keyValue[0]);
+        this.value = Long.parseLong(keyValue[1]);
     }
 
-    @Override public void copyFrom(Object source) {
-        IntKeyLongValue value = (IntKeyLongValue)source;
+    @Override
+    public void copyFrom(Object source) {
+        IntKeyLongValue value = (IntKeyLongValue) source;
         this.key = value.key;
         this.value = value.value;
     }

@@ -18,15 +18,13 @@
 
 package org.apache.skywalking.oap.server.core.query.entity;
 
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
 
-/**
- * @author peng-yongsheng
- */
 @Getter
 @Setter
 public class EndpointInfo {
-    private int id;
+    private String id;
     private String name;
     private int serviceId;
     private String serviceName;
