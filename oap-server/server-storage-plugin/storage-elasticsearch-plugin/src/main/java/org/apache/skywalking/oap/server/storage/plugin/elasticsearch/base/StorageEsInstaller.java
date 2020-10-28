@@ -104,7 +104,9 @@ public class StorageEsInstaller extends ModelInstaller {
     protected Map<String, Object> createSetting(Model model) {
         Map<String, Object> setting = new HashMap<>();
 
-        setting.put("index.number_of_replicas", config.getIndexReplicasNumber());
+        setting.put("index.number_of_replicas", model.isSuperDataset()
+            ? config.getSuperDatasetIndexReplicasNumber()
+            : config.getIndexReplicasNumber());
         setting.put("index.number_of_shards", model.isSuperDataset()
             ? config.getIndexShardsNumber() * config.getSuperDatasetIndexShardsFactor()
             : config.getIndexShardsNumber());
@@ -133,7 +135,7 @@ public class StorageEsInstaller extends ModelInstaller {
                 String matchCName = MatchCNameBuilder.INSTANCE.build(columnDefine.getColumnName().getName());
 
                 Map<String, Object> originalColumn = new HashMap<>();
-                originalColumn.put("type", columnTypeEsMapping.transform(columnDefine.getType()));
+                originalColumn.put("type", columnTypeEsMapping.transform(columnDefine.getType(), columnDefine.getGenericType()));
                 originalColumn.put("copy_to", matchCName);
                 properties.put(columnDefine.getColumnName().getName(), originalColumn);
 
@@ -143,7 +145,7 @@ public class StorageEsInstaller extends ModelInstaller {
                 properties.put(matchCName, matchColumn);
             } else {
                 Map<String, Object> column = new HashMap<>();
-                column.put("type", columnTypeEsMapping.transform(columnDefine.getType()));
+                column.put("type", columnTypeEsMapping.transform(columnDefine.getType(), columnDefine.getGenericType()));
                 if (columnDefine.isStorageOnly()) {
                     column.put("index", false);
                 }

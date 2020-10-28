@@ -35,18 +35,18 @@ public class GraphqlInterceptor implements InstanceMethodsAroundInterceptor {
     @Override
     public void beforeMethod(EnhancedInstance objInst, Method method, Object[] allArguments, Class<?>[] argumentsTypes, MethodInterceptResult result) throws Throwable {
         ExecutionStrategyParameters parameters = (ExecutionStrategyParameters) allArguments[1];
-        if (parameters == null || parameters.getParent().getPath() != ExecutionPath.rootPath()) {
+        if (parameters == null || !parameters.getParent().getPath().equals(ExecutionPath.rootPath())) {
             return;
         }
         AbstractSpan span = ContextManager.createLocalSpan(parameters.getField().getSingleField().getName());
-        Tags.LOGIC_ENDPOINT.set(span, buildLogicEndpointSpan());
+        Tags.LOGIC_ENDPOINT.set(span, Tags.VAL_LOCAL_SPAN_AS_LOGIC_ENDPOINT);
         span.setComponent(ComponentsDefine.GRAPHQL);
     }
 
     @Override
     public Object afterMethod(EnhancedInstance objInst, Method method, Object[] allArguments, Class<?>[] argumentsTypes, Object ret) throws Throwable {
         ExecutionStrategyParameters parameters = (ExecutionStrategyParameters) allArguments[1];
-        if (parameters == null || parameters.getParent().getPath() != ExecutionPath.rootPath()) {
+        if (parameters == null || !parameters.getParent().getPath().equals(ExecutionPath.rootPath())) {
             return ret;
         }
         ContextManager.stopSpan();
@@ -56,7 +56,7 @@ public class GraphqlInterceptor implements InstanceMethodsAroundInterceptor {
     @Override
     public void handleMethodException(EnhancedInstance objInst, Method method, Object[] allArguments, Class<?>[] argumentsTypes, Throwable t) {
         ExecutionStrategyParameters parameters = (ExecutionStrategyParameters) allArguments[1];
-        if (parameters == null || parameters.getParent().getPath() != ExecutionPath.rootPath()) {
+        if (parameters == null || !parameters.getParent().getPath().equals(ExecutionPath.rootPath())) {
             return;
         }
         dealException(t);
@@ -64,11 +64,6 @@ public class GraphqlInterceptor implements InstanceMethodsAroundInterceptor {
 
     private void dealException(Throwable throwable) {
         AbstractSpan span = ContextManager.activeSpan();
-        span.errorOccurred();
         span.log(throwable);
-    }
-
-    private String buildLogicEndpointSpan() {
-        return "{\"logic-span\":true}";
     }
 }
