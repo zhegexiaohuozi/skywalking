@@ -21,18 +21,16 @@ package org.apache.skywalking.oap.query.graphql.resolver;
 import com.coxautodev.graphql.tools.GraphQLQueryResolver;
 import com.google.common.base.Strings;
 import java.io.IOException;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.skywalking.oap.query.graphql.type.TraceQueryCondition;
 import org.apache.skywalking.oap.server.core.Const;
 import org.apache.skywalking.oap.server.core.CoreModule;
 import org.apache.skywalking.oap.server.core.UnexpectedException;
-import org.apache.skywalking.oap.server.core.query.DurationUtils;
 import org.apache.skywalking.oap.server.core.query.TraceQueryService;
-import org.apache.skywalking.oap.server.core.query.entity.Pagination;
-import org.apache.skywalking.oap.server.core.query.entity.QueryOrder;
-import org.apache.skywalking.oap.server.core.query.entity.Trace;
-import org.apache.skywalking.oap.server.core.query.entity.TraceBrief;
-import org.apache.skywalking.oap.server.core.query.entity.TraceState;
+import org.apache.skywalking.oap.server.core.query.input.TraceQueryCondition;
+import org.apache.skywalking.oap.server.core.query.type.Pagination;
+import org.apache.skywalking.oap.server.core.query.type.QueryOrder;
+import org.apache.skywalking.oap.server.core.query.type.Trace;
+import org.apache.skywalking.oap.server.core.query.type.TraceBrief;
+import org.apache.skywalking.oap.server.core.query.type.TraceState;
 import org.apache.skywalking.oap.server.library.module.ModuleManager;
 
 import static java.util.Objects.nonNull;
@@ -61,12 +59,8 @@ public class TraceQuery implements GraphQLQueryResolver {
         if (!Strings.isNullOrEmpty(condition.getTraceId())) {
             traceId = condition.getTraceId();
         } else if (nonNull(condition.getQueryDuration())) {
-            startSecondTB = DurationUtils.INSTANCE.startTimeDurationToSecondTimeBucket(condition.getQueryDuration()
-                                                                                                .getStep(), condition.getQueryDuration()
-                                                                                                                     .getStart());
-            endSecondTB = DurationUtils.INSTANCE.endTimeDurationToSecondTimeBucket(condition.getQueryDuration()
-                                                                                            .getStep(), condition.getQueryDuration()
-                                                                                                                 .getEnd());
+            startSecondTB = condition.getQueryDuration().getStartTimeBucketInSec();
+            endSecondTB = condition.getQueryDuration().getEndTimeBucketInSec();
         } else {
             throw new UnexpectedException("The condition must contains either queryDuration or traceId.");
         }
@@ -74,14 +68,15 @@ public class TraceQuery implements GraphQLQueryResolver {
         int minDuration = condition.getMinTraceDuration();
         int maxDuration = condition.getMaxTraceDuration();
         String endpointName = condition.getEndpointName();
-        int serviceId = StringUtils.isEmpty(condition.getServiceId()) ? 0 : Integer.parseInt(condition.getServiceId());
         String endpointId = condition.getEndpointId();
-        int serviceInstanceId = StringUtils.isEmpty(condition.getServiceInstanceId()) ? 0 : Integer.parseInt(condition.getServiceInstanceId());
         TraceState traceState = condition.getTraceState();
         QueryOrder queryOrder = condition.getQueryOrder();
         Pagination pagination = condition.getPaging();
 
-        return getQueryService().queryBasicTraces(serviceId, serviceInstanceId, endpointId, traceId, endpointName, minDuration, maxDuration, traceState, queryOrder, pagination, startSecondTB, endSecondTB);
+        return getQueryService().queryBasicTraces(
+            condition.getServiceId(), condition.getServiceInstanceId(), endpointId, traceId, endpointName, minDuration,
+            maxDuration, traceState, queryOrder, pagination, startSecondTB, endSecondTB, condition.getTags()
+        );
     }
 
     public Trace queryTrace(final String traceId) throws IOException {

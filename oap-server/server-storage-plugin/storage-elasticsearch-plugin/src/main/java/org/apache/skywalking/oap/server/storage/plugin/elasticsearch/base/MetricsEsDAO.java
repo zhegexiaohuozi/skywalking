@@ -44,8 +44,8 @@ public class MetricsEsDAO extends EsDAO implements IMetricsDAO {
     public List<Metrics> multiGet(Model model, List<String> ids) throws IOException {
         SearchResponse response = getClient().ids(model.getName(), ids.toArray(new String[0]));
 
-        List<Metrics> result = new ArrayList<>((int) response.getHits().totalHits);
-        for (int i = 0; i < response.getHits().totalHits; i++) {
+        List<Metrics> result = new ArrayList<>(response.getHits().getHits().length);
+        for (int i = 0; i < response.getHits().getHits().length; i++) {
             Metrics source = storageBuilder.map2Data(response.getHits().getAt(i).getSourceAsMap());
             result.add(source);
         }
@@ -55,14 +55,14 @@ public class MetricsEsDAO extends EsDAO implements IMetricsDAO {
     @Override
     public InsertRequest prepareBatchInsert(Model model, Metrics metrics) throws IOException {
         XContentBuilder builder = map2builder(storageBuilder.data2Map(metrics));
-        String modelName = TimeSeriesUtils.timeSeries(model, metrics.getTimeBucket());
+        String modelName = TimeSeriesUtils.writeIndexName(model, metrics.getTimeBucket());
         return getClient().prepareInsert(modelName, metrics.id(), builder);
     }
 
     @Override
     public UpdateRequest prepareBatchUpdate(Model model, Metrics metrics) throws IOException {
         XContentBuilder builder = map2builder(storageBuilder.data2Map(metrics));
-        String modelName = TimeSeriesUtils.timeSeries(model, metrics.getTimeBucket());
+        String modelName = TimeSeriesUtils.writeIndexName(model, metrics.getTimeBucket());
         return getClient().prepareUpdate(modelName, metrics.id(), builder);
     }
 }

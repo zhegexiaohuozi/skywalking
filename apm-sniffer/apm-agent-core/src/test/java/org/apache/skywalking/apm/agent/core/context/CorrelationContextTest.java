@@ -111,7 +111,7 @@ public class CorrelationContextTest {
         // empty value
         context = new CorrelationContext();
         context.deserialize("dGVzdDE=:");
-        Assert.assertEquals("", context.get("test1").get());
+        Assert.assertFalse(context.get("test1").isPresent());
 
         // empty string
         context = new CorrelationContext();
@@ -120,5 +120,4 @@ public class CorrelationContextTest {
         context.deserialize(null);
         Assert.assertNull(context.get("test1").orElse(null));
     }
-
 }

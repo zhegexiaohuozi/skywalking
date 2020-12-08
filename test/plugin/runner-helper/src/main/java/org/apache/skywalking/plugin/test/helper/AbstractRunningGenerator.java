@@ -29,7 +29,7 @@ import org.apache.logging.log4j.Logger;
 import org.apache.skywalking.plugin.test.helper.exception.GenerateFailedException;
 
 public abstract class AbstractRunningGenerator implements ScenarioRunningScriptGenerator {
-    private Logger logger = LogManager.getLogger(MethodHandles.lookup().lookupClass());
+    private static final Logger LOGGER = LogManager.getLogger(MethodHandles.lookup().lookupClass());
     protected final Configuration cfg;
 
     protected AbstractRunningGenerator() {
@@ -49,16 +49,14 @@ public abstract class AbstractRunningGenerator implements ScenarioRunningScriptG
     public final void generate(IConfiguration configuration) throws GenerateFailedException {
         generateAdditionFiles(configuration);
 
-        Map<String, Object> root = new HashMap<>();
+        final Map<String, Object> root = configuration.toMap();
         root.put("running_script", runningScript(configuration));
-        root.put("scenario_name", configuration.scenarioName());
-        root.put("scenario_version", configuration.scenarioVersion());
 
         try {
             cfg.getTemplate("scenario.sh")
                .process(root, new FileWriter(new File(configuration.outputDir() + File.separator + "scenario.sh")));
         } catch (Exception e) {
-            logger.error("Failed to write scenario.sh", e);
+            LOGGER.error("Failed to write scenario.sh", e);
         }
     }
 

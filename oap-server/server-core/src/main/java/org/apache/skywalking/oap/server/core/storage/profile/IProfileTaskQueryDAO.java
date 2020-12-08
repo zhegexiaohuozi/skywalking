@@ -20,7 +20,7 @@ package org.apache.skywalking.oap.server.core.storage.profile;
 
 import java.io.IOException;
 import java.util.List;
-import org.apache.skywalking.oap.server.core.query.entity.ProfileTask;
+import org.apache.skywalking.oap.server.core.query.type.ProfileTask;
 import org.apache.skywalking.oap.server.core.storage.DAO;
 
 /**
@@ -37,7 +37,7 @@ public interface IProfileTaskQueryDAO extends DAO {
      * @param endTimeBucket   time bucket small than or equals, nullable
      * @param limit           limit count, if null means query all
      */
-    List<ProfileTask> getTaskList(final Integer serviceId, final String endpointName, final Long startTimeBucket,
+    List<ProfileTask> getTaskList(final String serviceId, final String endpointName, final Long startTimeBucket,
         final Long endTimeBucket, final Integer limit) throws IOException;
 
     /**

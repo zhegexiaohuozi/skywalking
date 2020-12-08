@@ -27,7 +27,7 @@ import java.util.LinkedList;
 import java.util.List;
 import org.apache.skywalking.apm.util.StringUtil;
 import org.apache.skywalking.oap.server.core.profile.ProfileTaskRecord;
-import org.apache.skywalking.oap.server.core.query.entity.ProfileTask;
+import org.apache.skywalking.oap.server.core.query.type.ProfileTask;
 import org.apache.skywalking.oap.server.core.storage.profile.IProfileTaskQueryDAO;
 import org.apache.skywalking.oap.server.library.client.jdbc.JDBCClientException;
 import org.apache.skywalking.oap.server.library.client.jdbc.hikaricp.JDBCHikariCPClient;
@@ -40,7 +40,7 @@ public class H2ProfileTaskQueryDAO implements IProfileTaskQueryDAO {
     }
 
     @Override
-    public List<ProfileTask> getTaskList(Integer serviceId, String endpointName, Long startTimeBucket,
+    public List<ProfileTask> getTaskList(String serviceId, String endpointName, Long startTimeBucket,
                                          Long endTimeBucket, Integer limit) throws IOException {
         final StringBuilder sql = new StringBuilder();
         final ArrayList<Object> condition = new ArrayList<>(4);
@@ -56,7 +56,7 @@ public class H2ProfileTaskQueryDAO implements IProfileTaskQueryDAO {
             condition.add(endTimeBucket);
         }
 
-        if (serviceId != null) {
+        if (StringUtil.isNotEmpty(serviceId)) {
             sql.append(" and ").append(ProfileTaskRecord.SERVICE_ID).append("=? ");
             condition.add(serviceId);
         }
@@ -116,7 +116,7 @@ public class H2ProfileTaskQueryDAO implements IProfileTaskQueryDAO {
     private ProfileTask parseTask(ResultSet data) throws SQLException {
         return ProfileTask.builder()
                           .id(data.getString("id"))
-                          .serviceId(data.getInt(ProfileTaskRecord.SERVICE_ID))
+                          .serviceId(data.getString(ProfileTaskRecord.SERVICE_ID))
                           .endpointName(data.getString(ProfileTaskRecord.ENDPOINT_NAME))
                           .startTime(data.getLong(ProfileTaskRecord.START_TIME))
                           .createTime(data.getLong(ProfileTaskRecord.CREATE_TIME))

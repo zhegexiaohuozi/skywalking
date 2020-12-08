@@ -18,8 +18,11 @@
 
 package org.apache.skywalking.oap.server.core.source;
 
+import java.util.ArrayList;
+import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.skywalking.oap.server.core.analysis.manual.segment.SpanTag;
 
 import static org.apache.skywalking.oap.server.core.source.DefaultScopeDefine.SEGMENT;
 
@@ -44,10 +47,10 @@ public class Segment extends Source {
     private String traceId;
     @Setter
     @Getter
-    private int serviceId;
+    private String serviceId;
     @Setter
     @Getter
-    private int serviceInstanceId;
+    private String serviceInstanceId;
     @Setter
     @Getter
     private String endpointName;
@@ -72,4 +75,7 @@ public class Segment extends Source {
     @Setter
     @Getter
     private int version;
+    @Setter
+    @Getter
+    private List<SpanTag> tags = new ArrayList<>();
 }

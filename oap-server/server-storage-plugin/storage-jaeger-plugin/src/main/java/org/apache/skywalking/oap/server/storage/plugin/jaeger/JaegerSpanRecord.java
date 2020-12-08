@@ -31,8 +31,10 @@ import org.apache.skywalking.oap.server.core.analysis.worker.RecordStreamProcess
 import org.apache.skywalking.oap.server.core.source.DefaultScopeDefine;
 import org.apache.skywalking.oap.server.core.storage.StorageBuilder;
 import org.apache.skywalking.oap.server.core.storage.annotation.Column;
+import org.apache.skywalking.oap.server.core.storage.annotation.SuperDataset;
 import org.apache.skywalking.oap.server.library.util.CollectionUtils;
 
+@SuperDataset
 @Stream(name = JaegerSpanRecord.INDEX_NAME, scopeId = DefaultScopeDefine.JAEGER_SPAN, builder = JaegerSpanRecord.Builder.class, processor = RecordStreamProcessor.class)
 public class JaegerSpanRecord extends Record {
     public static final String INDEX_NAME = "jaeger_span";
@@ -60,11 +62,11 @@ public class JaegerSpanRecord extends Record {
     @Setter
     @Getter
     @Column(columnName = SERVICE_ID)
-    private int serviceId;
+    private String serviceId;
     @Setter
     @Getter
     @Column(columnName = SERVICE_INSTANCE_ID)
-    private int serviceInstanceId;
+    private String serviceInstanceId;
     @Setter
     @Getter
     @Column(columnName = ENDPOINT_NAME, matchQuery = true)
@@ -133,8 +135,8 @@ public class JaegerSpanRecord extends Record {
             JaegerSpanRecord record = new JaegerSpanRecord();
             record.setTraceId((String) dbMap.get(TRACE_ID));
             record.setSpanId((String) dbMap.get(SPAN_ID));
-            record.setServiceId(((Number) dbMap.get(SERVICE_ID)).intValue());
-            record.setServiceInstanceId(((Number) dbMap.get(SERVICE_INSTANCE_ID)).intValue());
+            record.setServiceId((String) dbMap.get(SERVICE_ID));
+            record.setServiceInstanceId((String) dbMap.get(SERVICE_INSTANCE_ID));
             record.setEndpointName((String) dbMap.get(ENDPOINT_NAME));
             record.setEndpointId((String) dbMap.get(ENDPOINT_ID));
             record.setStartTime(((Number) dbMap.get(START_TIME)).longValue());

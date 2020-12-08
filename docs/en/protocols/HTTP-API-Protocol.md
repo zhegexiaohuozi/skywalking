@@ -1,86 +1,44 @@
 # HTTP API Protocol
 
 HTTP API Protocol defines the API data format, including api request and response data format.
+They use the HTTP1.1 wrapper of the official [SkyWalking Trace Data Protocol v3](Trace-Data-Protocol-v3.md). Read it for more details.
 
-### Do register
+## Instance Management
 
-Detail information about data format can be found in  [Register service](https://github.com/apache/skywalking-data-collect-protocol/tree/master/register/Register.proto).
-And register steps followings [SkyWalking Trace Data Protocol v2](Trace-Data-Protocol-v3.md).
+Detail information about data format can be found in [Instance Management](https://github.com/apache/skywalking-data-collect-protocol/blob/master/management/Management.proto).
 
-- Service Register
+- Report service instance properties
 
-> POST http://localhost:12800/v2/service/register
+> POST http://localhost:12800/v3/management/reportProperties
 
 Input:
 
 ```json
 {
-  "services": [
-    {
-      "type": "normal",
-      "serviceName": "Service Name"
-    }
-  ]
+	"service": "User Service Name",
+	"serviceInstance": "User Service Instance Name",
+	"properties": [{
+		"language": "Lua"
+	}]
 }
 ```
 
 Output JSON Array:
 
 ```json
-[
-    {
-        "key": "Service Name",
-        "value": 2
-    }
-]
+{}
 ```
 
-- Service instance Register
+- Service instance ping
 
-> POST http://localhost:12800/v2/instance/register
+> POST http://localhost:12800/v3/management/keepAlive
 
 Input:
 
 ```json
 {
-  "instances": [
-    {
-      "time": 1582428603392,
-      "instanceUUID": "NAME:Service Instance Name",
-      "properties": [
-        {
-          "key": "language",
-          "value": "Lua"
-        }
-      ],
-      "serviceId": 2
-    }
-  ]
-}
-```
-
-OutPut:
-
-```json
-[
-    {
-        "key": "NAME:Service Instance Name",
-        "value": 0
-    }
-]
-```
-
-- Service instance heartbeat
-
-> POST http://localhost:12800/v2/instance/heartbeat
-
-Input:
-
-```json
-{
-  "serviceInstanceId":20,
-  "time": 1582428603392,
-  "serviceInstanceUUID":"NAME:Service Instance Name"
+	"service": "User Service Name",
+	"serviceInstance": "User Service Instance Name"
 }
 ```
 
@@ -89,109 +47,137 @@ OutPut:
 ```json
 {}
 ```
-If your instance does not exist, you need to clean your local service instance metadata in your application and re-do register:
-
-```json
-{
-    "commands": [
-        {
-            "command": "ServiceMetadataReset",
-            "args": [
-                {
-                    "key": "SerialNumber",
-                    "value": "44bd2664-03c7-46bc-8652-52fcde0e7699"
-                }
-            ]
-        }
-    ]
-}
-```  
 
 ## Trace Report
 
-### POST http://localhost:12800/v2/segments
+Detail information about data format can be found in [Instance Management](https://github.com/apache/skywalking-data-collect-protocol/blob/master/language-agent/Tracing.proto).
+There are two ways to report segment data, one segment per request or segment array in the bulk mode.
+
+### POST http://localhost:12800/v3/segment
+
+Send a single segment object with JSON format.
 
 Input:
 
 ```json
 {
-  "spans": [
-    {
-      "operationName": "/tier2/lb",
-      "startTime": 1582461179910,
-      "tags": [],
-      "endTime": 1582461179922,
-      "spanType": "Exit",
-      "logs":[],
-      "spanId": 1,
-      "isError": false,
-      "parentSpanId": 0,
-      "componentId": 6000,
-      "peer": "User Service Name-nginx:upstream_ip:port",
-      "spanLayer": "Http"
-    },
-    {
-      "operationName": "/tier2/lb",
-      "startTime": 1582461179910,
-      "tags": [
-        {
-          "key": "http.method",
-          "value": "GET"
-        },
-        {
-          "key": "http.params",
-          "value": "http://127.0.0.1/tier2/lb"
-        }
-      ],
-      "endTime": 1582461179922,
-      "spanType": "Entry",
-      "logs": [],
-      "spanId": 0,
-      "isError": false,
-      "parentSpanId": -1,
-      "componentId": 6000,
-      "refs": [
-        {
-          "parentTraceSegmentId": {
-            "idParts": [
-              1582461179038,
-              794206293,
-              69887
-            ]
-          },
-          "parentEndpointId": 0,
-          "entryEndpointId": 0,
-          "parentServiceInstanceId": 1,
-          "parentEndpoint": "/ingress",
-          "networkAddress": "#User Service Name-nginx:upstream_ip:port",
-          "parentSpanId": 1,
-          "entryServiceInstanceId": 1,
-          "networkAddressId": 0,
-          "entryEndpoint": "/ingress"
-        }
-      ],
-      "spanLayer": "Http"
-    }
-  ],
-  "serviceInstanceId": 1,
-  "serviceId": 1,
-  "traceSegmentId": {
-    "idParts": [
-      1582461179044,
-      794206293,
-      69887
-    ]
-  },
-  "globalTraceIds": [
-    {
-      "idParts": [
-        1582461179038,
-        794206293,
-        69887
-      ]
-    }
-  ]
+	"traceId": "a12ff60b-5807-463b-a1f8-fb1c8608219e",
+	"serviceInstance": "User_Service_Instance_Name",
+	"spans": [{
+		"operationName": "/ingress",
+		"startTime": 1588664577013,
+		"endTime": 1588664577028,
+		"spanType": "Exit",
+		"spanId": 1,
+		"isError": false,
+		"parentSpanId": 0,
+		"componentId": 6000,
+		"peer": "upstream service",
+		"spanLayer": "Http"
+	}, {
+		"operationName": "/ingress",
+		"startTime": 1588664577013,
+		"tags": [{
+			"key": "http.method",
+			"value": "GET"
+		}, {
+			"key": "http.params",
+			"value": "http://localhost/ingress"
+		}],
+		"endTime": 1588664577028,
+		"spanType": "Entry",
+		"spanId": 0,
+		"parentSpanId": -1,
+		"isError": false,
+		"spanLayer": "Http",
+		"componentId": 6000
+	}],
+	"service": "User_Service_Name",
+	"traceSegmentId": "a12ff60b-5807-463b-a1f8-fb1c8608219e"
 }
+```
+ OutPut:
+ 
+ ```json
+
+```
+
+### POST http://localhost:12800/v3/segments
+
+Send a segment object list with JSON format.
+
+Input:
+
+```json
+[{
+	"traceId": "a12ff60b-5807-463b-a1f8-fb1c8608219e",
+	"serviceInstance": "User_Service_Instance_Name",
+	"spans": [{
+		"operationName": "/ingress",
+		"startTime": 1588664577013,
+		"endTime": 1588664577028,
+		"spanType": "Exit",
+		"spanId": 1,
+		"isError": false,
+		"parentSpanId": 0,
+		"componentId": 6000,
+		"peer": "upstream service",
+		"spanLayer": "Http"
+	}, {
+		"operationName": "/ingress",
+		"startTime": 1588664577013,
+		"tags": [{
+			"key": "http.method",
+			"value": "GET"
+		}, {
+			"key": "http.params",
+			"value": "http://localhost/ingress"
+		}],
+		"endTime": 1588664577028,
+		"spanType": "Entry",
+		"spanId": 0,
+		"parentSpanId": -1,
+		"isError": false,
+		"spanLayer": "Http",
+		"componentId": 6000
+	}],
+	"service": "User_Service_Name",
+	"traceSegmentId": "a12ff60b-5807-463b-a1f8-fb1c8608219e"
+}, {
+	"traceId": "f956699e-5106-4ea3-95e5-da748c55bac1",
+	"serviceInstance": "User_Service_Instance_Name",
+	"spans": [{
+		"operationName": "/ingress",
+		"startTime": 1588664577250,
+		"endTime": 1588664577250,
+		"spanType": "Exit",
+		"spanId": 1,
+		"isError": false,
+		"parentSpanId": 0,
+		"componentId": 6000,
+		"peer": "upstream service",
+		"spanLayer": "Http"
+	}, {
+		"operationName": "/ingress",
+		"startTime": 1588664577250,
+		"tags": [{
+			"key": "http.method",
+			"value": "GET"
+		}, {
+			"key": "http.params",
+			"value": "http://localhost/ingress"
+		}],
+		"endTime": 1588664577250,
+		"spanType": "Entry",
+		"spanId": 0,
+		"parentSpanId": -1,
+		"isError": false,
+		"spanLayer": "Http",
+		"componentId": 6000
+	}],
+	"service": "User_Service_Name",
+	"traceSegmentId": "f956699e-5106-4ea3-95e5-da748c55bac1"
+}]
 ```
  OutPut:
  

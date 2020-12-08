@@ -81,11 +81,11 @@ public class ProfileE2E extends SkyWalkingTestAdapter {
 
     @SuppressWarnings("unused")
     @ContainerHostAndPort(name = "ui", port = 8080)
-    private HostAndPort swWebappHostPort;
+    protected HostAndPort swWebappHostPort;
 
     @SuppressWarnings("unused")
     @ContainerHostAndPort(name = "provider", port = 9090)
-    private HostAndPort serviceHostPort;
+    protected HostAndPort serviceHostPort;
 
     @SuppressWarnings("unused")
     @DockerContainer("oap")
@@ -140,8 +140,8 @@ public class ProfileE2E extends SkyWalkingTestAdapter {
     @Order(3)
     void createProfileTask() throws Exception {
         final ProfileTaskCreationRequest creationRequest = ProfileTaskCreationRequest.builder()
-                                                                                     .serviceId(2)
-                                                                                     .endpointName("/profile/users")
+                                                                                     .serviceId("ZTJlLXByb2ZpbGUtc2VydmljZQ==.1")
+                                                                                     .endpointName("{POST}/profile/{name}")
                                                                                      .duration(1)
                                                                                      .startTime(-1)
                                                                                      .minDurationThreshold(1500)
@@ -183,6 +183,7 @@ public class ProfileE2E extends SkyWalkingTestAdapter {
                 load("expected/profile/profileSegments.yml").as(TracesMatcher.class).verifyLoosely(traces);
 
                 foundedTrace = traces.get(0);
+                break;
             } catch (Exception e) {
                 if (i == 10 - 1) {
                     throw new IllegalStateException("match profiled segment list fail!", e);
@@ -211,7 +212,7 @@ public class ProfileE2E extends SkyWalkingTestAdapter {
         validateExporter(taskId, foundedTrace.getTraceIds().get(0));
     }
 
-    private void verifyProfileTask(int serviceId, String verifyResources) throws Exception {
+    private void verifyProfileTask(String serviceId, String verifyResources) throws Exception {
         for (int i = 0; i < 10; i++) {
             try {
                 final ProfileTasks tasks = graphql.getProfileTaskList(
@@ -221,6 +222,7 @@ public class ProfileE2E extends SkyWalkingTestAdapter {
                 LOGGER.info("get profile task list: {}", tasks);
 
                 load(verifyResources).as(ProfilesTasksMatcher.class).verify(tasks);
+                break;
             } catch (Throwable e) {
                 if (i == 10 - 1) {
                     throw new IllegalStateException("match profile task list fail!", e);
@@ -255,12 +257,14 @@ public class ProfileE2E extends SkyWalkingTestAdapter {
             "/skywalking/tools/profile-exporter/profile_exporter.sh --taskid=%s --traceid=%s /tmp",
             taskId, traceId
         );
-        final Container.ExecResult exportResult = oapContainer.execInContainer("/bin/bash", "-c", exportShell);
+        final Container.ExecResult exportResult = oapContainer.execInContainer("/bin/sh", "-c", exportShell);
 
         LOGGER.info("exported result: {}", exportResult);
 
+        assertThat(exportResult.getExitCode()).isEqualTo(0);
+
         final String lsExportedFileShell = String.format("ls /tmp/%s.tar.gz", traceId);
-        final Container.ExecResult checkExportedFileResult = oapContainer.execInContainer("/bin/bash", "-c", lsExportedFileShell);
+        final Container.ExecResult checkExportedFileResult = oapContainer.execInContainer("/bin/sh", "-c", lsExportedFileShell);
 
         LOGGER.info("check exported file result: {}", checkExportedFileResult);
 

@@ -16,7 +16,12 @@
 
 name: docker-ci
 
-on: [pull_request]
+on:
+  pull_request:
+    paths:
+      - '**'
+      - '!**.md'
+
 env:
   SKIP_TEST: true
   DOCKER_DIR: ./docker
@@ -26,16 +31,20 @@ jobs:
     runs-on: ubuntu-16.04
     timeout-minutes: 90
     strategy:
+      fail-fast: true
       matrix:
         es: [es6, es7]
     steps:
       - uses: actions/checkout@v2
-      # In the checkout@v2, it doesn't support git submodule. Execute the commands manually.
-      - name: checkout submodules
-        shell: bash
-        run: |
-          git submodule sync --recursive
-          git -c protocol.version=2 submodule update --init --force --recursive --depth=1
+        with:
+          submodules: true
+      - name: Cache local Maven repository
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
       - uses: actions/cache@v1
         with:
           path: ~/.m2/repository
@@ -47,8 +56,8 @@ jobs:
       - name: Bootstrap cluster
         run: |
           case ${{ matrix.es }} in
-          es6) export ES_TAG=6.8.1 ;; 
-          es7) export ES_TAG=7.5.0 ;; 
+          es6) export ES_TAG=6.8.1 ;;
+          es7) export ES_TAG=7.5.0 ;;
           esac
 
           export TAG=${{ matrix.es }}

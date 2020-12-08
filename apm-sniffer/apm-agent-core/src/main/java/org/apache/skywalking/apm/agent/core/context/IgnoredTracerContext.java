@@ -33,12 +33,14 @@ public class IgnoredTracerContext implements AbstractTracerContext {
     private static final NoopSpan NOOP_SPAN = new NoopSpan();
 
     private final CorrelationContext correlationContext;
+    private final ExtensionContext extensionContext;
 
     private int stackDepth;
 
     public IgnoredTracerContext() {
         this.stackDepth = 0;
         this.correlationContext = new CorrelationContext();
+        this.extensionContext = new ExtensionContext();
     }
 
     @Override
@@ -53,7 +55,7 @@ public class IgnoredTracerContext implements AbstractTracerContext {
 
     @Override
     public ContextSnapshot capture() {
-        return new ContextSnapshot(null, -1, null, correlationContext);
+        return new ContextSnapshot(null, -1, null, null, correlationContext, extensionContext);
     }
 
     @Override
@@ -62,8 +64,8 @@ public class IgnoredTracerContext implements AbstractTracerContext {
     }
 
     @Override
-    public String getReadableGlobalTraceId() {
-        return "[Ignored Trace]";
+    public String getReadablePrimaryTraceId() {
+        return "Ignored_Trace";
     }
 
     @Override

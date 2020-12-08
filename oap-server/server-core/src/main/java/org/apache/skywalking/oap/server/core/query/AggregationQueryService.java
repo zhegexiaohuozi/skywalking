@@ -19,16 +19,16 @@
 package org.apache.skywalking.oap.server.core.query;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
-import org.apache.skywalking.oap.server.core.CoreModule;
-import org.apache.skywalking.oap.server.core.analysis.Downsampling;
-import org.apache.skywalking.oap.server.core.analysis.manual.endpoint.EndpointTraffic;
-import org.apache.skywalking.oap.server.core.cache.ServiceInstanceInventoryCache;
-import org.apache.skywalking.oap.server.core.cache.ServiceInventoryCache;
-import org.apache.skywalking.oap.server.core.query.entity.Order;
-import org.apache.skywalking.oap.server.core.query.entity.TopNEntity;
-import org.apache.skywalking.oap.server.core.register.ServiceInstanceInventory;
-import org.apache.skywalking.oap.server.core.register.ServiceInventory;
+import org.apache.skywalking.apm.util.StringUtil;
+import org.apache.skywalking.oap.server.core.Const;
+import org.apache.skywalking.oap.server.core.analysis.IDManager;
+import org.apache.skywalking.oap.server.core.analysis.manual.instance.InstanceTraffic;
+import org.apache.skywalking.oap.server.core.query.input.Duration;
+import org.apache.skywalking.oap.server.core.query.input.TopNCondition;
+import org.apache.skywalking.oap.server.core.query.type.KeyValue;
+import org.apache.skywalking.oap.server.core.query.type.SelectedRecord;
 import org.apache.skywalking.oap.server.core.storage.StorageModule;
 import org.apache.skywalking.oap.server.core.storage.annotation.ValueColumnMetadata;
 import org.apache.skywalking.oap.server.core.storage.query.IAggregationQueryDAO;
@@ -36,7 +36,6 @@ import org.apache.skywalking.oap.server.library.module.ModuleManager;
 import org.apache.skywalking.oap.server.library.module.Service;
 
 public class AggregationQueryService implements Service {
-
     private final ModuleManager moduleManager;
     private IAggregationQueryDAO aggregationQueryDAO;
 
@@ -53,93 +52,54 @@ public class AggregationQueryService implements Service {
         return aggregationQueryDAO;
     }
 
-    public List<TopNEntity> getServiceTopN(final String indName, final int topN, final Downsampling downsampling,
-                                           final long startTB, final long endTB, final Order order) throws IOException {
-        List<TopNEntity> topNEntities = getAggregationQueryDAO().getServiceTopN(
-            indName, ValueColumnMetadata.INSTANCE.getValueCName(indName), topN, downsampling, startTB, endTB, order);
-        for (TopNEntity entity : topNEntities) {
-            ServiceInventory inventory = moduleManager.find(CoreModule.NAME)
-                                                      .provider()
-                                                      .getService(ServiceInventoryCache.class)
-                                                      .get(Integer.parseInt(entity.getId()));
-            if (inventory != null) {
-                entity.setName(inventory.getName());
+    public List<SelectedRecord> sortMetrics(TopNCondition condition, Duration duration) throws IOException {
+        final String valueCName = ValueColumnMetadata.INSTANCE.getValueCName(condition.getName());
+        List<KeyValue> additionalConditions = null;
+        if (StringUtil.isNotEmpty(condition.getParentService())) {
+            additionalConditions = new ArrayList<>(1);
+            final String serviceId = IDManager.ServiceID.buildId(condition.getParentService(), condition.isNormal());
+            additionalConditions.add(new KeyValue(InstanceTraffic.SERVICE_ID, serviceId));
+        }
+        final List<SelectedRecord> selectedRecords = getAggregationQueryDAO().sortMetrics(
+            condition, valueCName, duration, additionalConditions);
+        selectedRecords.forEach(selectedRecord -> {
+            switch (condition.getScope()) {
+                case Service:
+                    selectedRecord.setName(IDManager.ServiceID.analysisId(selectedRecord.getId()).getName());
+                    break;
+                case ServiceInstance:
+                    final IDManager.ServiceInstanceID.InstanceIDDefinition instanceIDDefinition
+                        = IDManager.ServiceInstanceID.analysisId(selectedRecord.getId());
+                    /**
+                     * Add the service name into the name if this is global top N.
+                     */
+                    if (StringUtil.isEmpty(condition.getParentService())) {
+                        IDManager.ServiceID.ServiceIDDefinition serviceIDDefinition =
+                            IDManager.ServiceID.analysisId(instanceIDDefinition.getServiceId());
+                        selectedRecord.setName(serviceIDDefinition.getName() + " - " + instanceIDDefinition.getName());
+                    } else {
+                        selectedRecord.setName(instanceIDDefinition.getName());
+                    }
+                    break;
+                case Endpoint:
+                    final IDManager.EndpointID.EndpointIDDefinition endpointIDDefinition
+                        = IDManager.EndpointID.analysisId(selectedRecord.getId());
+                    /**
+                     * Add the service name into the name if this is global top N.
+                     */
+                    if (StringUtil.isEmpty(condition.getParentService())) {
+                        IDManager.ServiceID.ServiceIDDefinition serviceIDDefinition =
+                            IDManager.ServiceID.analysisId(endpointIDDefinition.getServiceId());
+                        selectedRecord.setName(serviceIDDefinition.getName()
+                                                   + " - " + endpointIDDefinition.getEndpointName());
+                    } else {
+                        selectedRecord.setName(endpointIDDefinition.getEndpointName());
+                    }
+                    break;
+                default:
+                    selectedRecord.setName(Const.UNKNOWN);
             }
-        }
-        return topNEntities;
-    }
-
-    public List<TopNEntity> getAllServiceInstanceTopN(final String indName,
-                                                      final int topN,
-                                                      final Downsampling downsampling,
-                                                      final long startTB,
-                                                      final long endTB,
-                                                      final Order order) throws IOException {
-        List<TopNEntity> topNEntities = getAggregationQueryDAO().getAllServiceInstanceTopN(
-            indName, ValueColumnMetadata.INSTANCE
-                .getValueCName(indName), topN, downsampling, startTB, endTB, order);
-        for (TopNEntity entity : topNEntities) {
-            ServiceInstanceInventory inventory = moduleManager.find(CoreModule.NAME)
-                                                              .provider()
-                                                              .getService(ServiceInstanceInventoryCache.class)
-                                                              .get(Integer.parseInt(entity.getId()));
-            if (inventory != null) {
-                entity.setName(inventory.getName());
-            }
-        }
-        return topNEntities;
-    }
-
-    public List<TopNEntity> getServiceInstanceTopN(final int serviceId,
-                                                   final String indName,
-                                                   final int topN,
-                                                   final Downsampling downsampling,
-                                                   final long startTB,
-                                                   final long endTB,
-                                                   final Order order) throws IOException {
-        List<TopNEntity> topNEntities = getAggregationQueryDAO().getServiceInstanceTopN(
-            serviceId, indName, ValueColumnMetadata.INSTANCE
-                .getValueCName(indName), topN, downsampling, startTB, endTB, order);
-        for (TopNEntity entity : topNEntities) {
-            ServiceInstanceInventory inventory = moduleManager.find(CoreModule.NAME)
-                                                              .provider()
-                                                              .getService(ServiceInstanceInventoryCache.class)
-                                                              .get(Integer.parseInt(entity.getId()));
-            if (inventory != null) {
-                entity.setName(inventory.getName());
-            }
-        }
-        return topNEntities;
-    }
-
-    public List<TopNEntity> getAllEndpointTopN(final String indName,
-                                               final int topN,
-                                               final Downsampling downsampling,
-                                               final long startTB,
-                                               final long endTB,
-                                               final Order order) throws IOException {
-        List<TopNEntity> topNEntities = getAggregationQueryDAO().getAllEndpointTopN(
-            indName, ValueColumnMetadata.INSTANCE.getValueCName(indName), topN, downsampling, startTB, endTB, order);
-
-        for (TopNEntity entity : topNEntities) {
-            entity.setName(EndpointTraffic.splitID(entity.getId()).getEndpointName());
-        }
-        return topNEntities;
-    }
-
-    public List<TopNEntity> getEndpointTopN(final int serviceId,
-                                            final String indName,
-                                            final int topN,
-                                            final Downsampling downsampling,
-                                            final long startTB,
-                                            final long endTB,
-                                            final Order order) throws IOException {
-        List<TopNEntity> topNEntities = getAggregationQueryDAO().getEndpointTopN(
-            serviceId, indName, ValueColumnMetadata.INSTANCE
-                .getValueCName(indName), topN, downsampling, startTB, endTB, order);
-        for (TopNEntity entity : topNEntities) {
-            entity.setName(EndpointTraffic.splitID(entity.getId()).getEndpointName());
-        }
-        return topNEntities;
+        });
+        return selectedRecords;
     }
 }

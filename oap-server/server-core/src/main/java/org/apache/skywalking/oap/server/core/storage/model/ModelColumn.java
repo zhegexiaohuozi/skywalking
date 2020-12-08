@@ -18,39 +18,35 @@
 
 package org.apache.skywalking.oap.server.core.storage.model;
 
+import java.lang.reflect.Type;
 import lombok.Getter;
-import org.apache.skywalking.oap.server.core.analysis.metrics.IntKeyLongValueHashMap;
+import org.apache.skywalking.oap.server.core.analysis.metrics.DataTable;
 
 @Getter
 public class ModelColumn {
     private final ColumnName columnName;
     private final Class<?> type;
+    private final Type genericType;
     private final boolean matchQuery;
     private final boolean storageOnly;
     private final int length;
 
     public ModelColumn(ColumnName columnName,
                        Class<?> type,
+                       Type genericType,
                        boolean matchQuery,
                        boolean storageOnly,
                        boolean isValue,
                        int length) {
         this.columnName = columnName;
         this.type = type;
+        this.genericType = genericType;
         this.matchQuery = matchQuery;
-
-        /*
-         * Only accept length in the String definition.
-         */
-        if (!type.equals(String.class)) {
-            this.length = 0;
-        } else {
-            this.length = length;
-        }
+        this.length = length;
         /*
          * byte[] and {@link IntKeyLongValueHashMap} could never be query.
          */
-        if (type.equals(byte[].class) || type.equals(IntKeyLongValueHashMap.class)) {
+        if (type.equals(byte[].class) || type.equals(DataTable.class)) {
             this.storageOnly = true;
         } else {
             if (storageOnly && isValue) {

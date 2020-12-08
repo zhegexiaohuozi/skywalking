@@ -18,14 +18,17 @@ name: E2E
 
 on:
   pull_request:
+    paths:
+      - '**'
+      - '!**.md'
   push:
     branches:
       - master
-    tags:
-      - 'v*'
 
 env:
   SKIP_TEST: true
+  SW_AGENT_JDK_VERSION: 8
+  CODECOV_TOKEN: d2065307-8f01-4637-9715-2781ef096db7
 
 jobs:
   Profiling:
@@ -39,18 +42,23 @@ jobs:
       SW_STORAGE: ${{ matrix.storage }}
     steps:
       - uses: actions/checkout@v2
-      - name: checkout submodules
-        shell: bash
-        run: |
-          git submodule sync --recursive
-          git -c protocol.version=2 submodule update --init --force --recursive --depth=1
+        with:
+          submodules: true
+      - name: Cache local Maven repository
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
       - name: Compile and Build
-        run: make docker && ES_VERSION=es7 TAG=latest-es7 make docker
+        run: make docker && ES_VERSION=es7 TAG=latest-es7 make docker.oap
       - name: Copy dist package
         run: cp -R dist test/e2e/
       - name: Profiling ${{ matrix.storage }}
         run: ./mvnw --batch-mode -f test/e2e/pom.xml -am -DfailIfNoTests=false verify -Dit.test=org.apache.skywalking.e2e.profile.ProfileE2E
-
+      - name: Report Coverage
+        run: bash -x tools/coverage/report.sh
       - uses: actions/upload-artifact@v1
         if: failure()
         with:

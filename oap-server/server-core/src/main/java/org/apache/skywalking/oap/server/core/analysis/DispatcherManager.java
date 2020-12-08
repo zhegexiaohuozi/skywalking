@@ -21,6 +21,7 @@ package org.apache.skywalking.oap.server.core.analysis;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.reflect.ClassPath;
 import java.io.IOException;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -34,7 +35,7 @@ import org.slf4j.LoggerFactory;
 
 public class DispatcherManager implements DispatcherDetectorListener {
 
-    private static final Logger logger = LoggerFactory.getLogger(DispatcherManager.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(DispatcherManager.class);
 
     private Map<Integer, List<SourceDispatcher>> dispatcherMap;
 
@@ -55,6 +56,7 @@ public class DispatcherManager implements DispatcherDetectorListener {
          * when the receiver is open, and oal script doesn't ask for analysis.
          */
         if (dispatchers != null) {
+            source.prepare();
             for (SourceDispatcher dispatcher : dispatchers) {
                 dispatcher.dispatch(source);
             }
@@ -79,7 +81,8 @@ public class DispatcherManager implements DispatcherDetectorListener {
 
     @Override
     public void addIfAsSourceDispatcher(Class aClass) throws IllegalAccessException, InstantiationException {
-        if (!aClass.isInterface() && SourceDispatcher.class.isAssignableFrom(aClass)) {
+        if (!aClass.isInterface() && !Modifier.isAbstract(
+            aClass.getModifiers()) && SourceDispatcher.class.isAssignableFrom(aClass)) {
             Type[] genericInterfaces = aClass.getGenericInterfaces();
             for (Type genericInterface : genericInterfaces) {
                 ParameterizedType anInterface = (ParameterizedType) genericInterface;
@@ -94,7 +97,8 @@ public class DispatcherManager implements DispatcherDetectorListener {
                     Object source = ((Class) argument).newInstance();
 
                     if (!Source.class.isAssignableFrom(source.getClass())) {
-                        throw new UnexpectedException("unexpected type argument of class " + aClass.getName() + ", should be `org.apache.skywalking.oap.server.core.source.Source`. ");
+                        throw new UnexpectedException(
+                            "unexpected type argument of class " + aClass.getName() + ", should be `org.apache.skywalking.oap.server.core.source.Source`. ");
                     }
 
                     Source dispatcherSource = (Source) source;
@@ -110,7 +114,7 @@ public class DispatcherManager implements DispatcherDetectorListener {
 
                     dispatchers.add(dispatcher);
 
-                    logger.info("Dispatcher {} is added into DefaultScopeDefine {}.", dispatcher.getClass()
+                    LOGGER.info("Dispatcher {} is added into DefaultScopeDefine {}.", dispatcher.getClass()
                                                                                                 .getName(), scopeId);
                 }
             }

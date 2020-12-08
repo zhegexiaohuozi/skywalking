@@ -25,18 +25,16 @@ import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.tag.Tags;
-
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 public class SkywalkingSpanBuilder implements Tracer.SpanBuilder {
-    private List<Tag> tags = new LinkedList<Tag>();
+    private List<Tag> tags = new ArrayList<Tag>();
     private String operationName;
     private boolean isEntry = false;
     private boolean isExit = false;
     private int port;
     private String peer;
-    private String componentName;
     private boolean isError = false;
     private long startTime;
 
@@ -73,9 +71,7 @@ public class SkywalkingSpanBuilder implements Tracer.SpanBuilder {
 
     @Override
     public Tracer.SpanBuilder withTag(String key, String value) {
-        if (Tags.COMPONENT.getKey().equals(key)) {
-            componentName = value;
-        } else if (Tags.SPAN_KIND.getKey().equals(key)) {
+        if (Tags.SPAN_KIND.getKey().equals(key)) {
             if (Tags.SPAN_KIND_CLIENT.equals(value) || Tags.SPAN_KIND_PRODUCER.equals(value)) {
                 isEntry = false;
                 isExit = true;
@@ -86,9 +82,8 @@ public class SkywalkingSpanBuilder implements Tracer.SpanBuilder {
                 isEntry = false;
                 isExit = false;
             }
-        } else if (Tags.PEER_HOST_IPV4.getKey().equals(key) || Tags.PEER_HOST_IPV6.getKey()
-                                                                                  .equals(key) || Tags.PEER_HOSTNAME.getKey()
-                                                                                                                    .equals(key)) {
+        } else if (Tags.PEER_HOST_IPV4.getKey().equals(key) ||
+            Tags.PEER_HOST_IPV6.getKey().equals(key) || Tags.PEER_HOSTNAME.getKey().equals(key)) {
             peer = value;
         } else if (Tags.PEER_SERVICE.getKey().equals(key)) {
             operationName = value;
@@ -167,16 +162,8 @@ public class SkywalkingSpanBuilder implements Tracer.SpanBuilder {
         return peer;
     }
 
-    public String getComponentName() {
-        return componentName;
-    }
-
     public boolean isError() {
         return isError;
-    }
-
-    public long getStartTime() {
-        return startTime;
     }
 
     /**

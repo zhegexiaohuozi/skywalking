@@ -20,12 +20,13 @@ package org.apache.skywalking.oap.server.core.source;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.apache.skywalking.oap.server.core.CoreModule;
-import org.apache.skywalking.oap.server.core.analysis.manual.RelationDefineUtil;
+import org.apache.skywalking.oap.server.core.analysis.IDManager;
+import org.apache.skywalking.oap.server.core.analysis.NodeType;
 
 import static org.apache.skywalking.oap.server.core.source.DefaultScopeDefine.ENDPOINT_RELATION;
+import static org.apache.skywalking.oap.server.core.source.DefaultScopeDefine.ENDPOINT_RELATION_CATALOG_NAME;
 
-@ScopeDeclaration(id = ENDPOINT_RELATION, name = "EndpointRelation")
+@ScopeDeclaration(id = ENDPOINT_RELATION, name = "EndpointRelation", catalog = ENDPOINT_RELATION_CATALOG_NAME)
 @ScopeDefaultColumn.VirtualColumnDefinition(fieldName = "entityId", columnName = "entity_id", isID = true, type = String.class)
 public class EndpointRelation extends Source {
 
@@ -34,57 +35,43 @@ public class EndpointRelation extends Source {
         return DefaultScopeDefine.ENDPOINT_RELATION;
     }
 
-    /**
-     * @since 7.1.0 SkyWalking doesn't do endpoint register. Use name directly.
-     */
     @Override
     public String getEntityId() {
-        return RelationDefineUtil.buildEndpointRelationEntityId(new RelationDefineUtil.EndpointRelationDefine(
-            serviceId, endpoint, childServiceId, childEndpoint, componentId
+        return IDManager.EndpointID.buildRelationId(new IDManager.EndpointID.EndpointRelationDefine(
+            serviceId, endpoint, childServiceId, childEndpoint
         ));
     }
 
     @Getter
+    @Setter
     @ScopeDefaultColumn.DefinedByField(columnName = "source_endpoint_name")
     private String endpoint;
 
-    public void setEndpoint(final String endpoint) {
-        this.endpoint = CoreModule.formatEndpointName(endpoint);
-    }
-
     @Getter
-    @Setter
     @ScopeDefaultColumn.DefinedByField(columnName = "service_id")
-    private int serviceId;
+    private String serviceId;
     @Getter
     @Setter
     @ScopeDefaultColumn.DefinedByField(columnName = "source_service_name", requireDynamicActive = true)
     private String serviceName;
-    @Getter
     @Setter
-    private int serviceInstanceId;
+    private NodeType serviceNodeType;
     @Getter
     @Setter
     private String serviceInstanceName;
     @Getter
+    @Setter
     @ScopeDefaultColumn.DefinedByField(columnName = "child_endpoint_name")
     private String childEndpoint;
-
-    public void setChildEndpoint(final String childEndpoint) {
-        this.childEndpoint = CoreModule.formatEndpointName(childEndpoint);
-    }
-
     @Getter
-    @Setter
     @ScopeDefaultColumn.DefinedByField(columnName = "child_service_id")
-    private int childServiceId;
+    private String childServiceId;
     @Setter
     @Getter
     @ScopeDefaultColumn.DefinedByField(columnName = "child_service_name", requireDynamicActive = true)
     private String childServiceName;
-    @Getter
     @Setter
-    private int childServiceInstanceId;
+    private NodeType childServiceNodeType;
     @Getter
     @Setter
     private String childServiceInstanceName;
@@ -106,5 +93,11 @@ public class EndpointRelation extends Source {
     @Getter
     @Setter
     private DetectPoint detectPoint;
+
+    @Override
+    public void prepare() {
+        serviceId = IDManager.ServiceID.buildId(serviceName, serviceNodeType);
+        childServiceId = IDManager.ServiceID.buildId(childServiceName, childServiceNodeType);
+    }
 }
 

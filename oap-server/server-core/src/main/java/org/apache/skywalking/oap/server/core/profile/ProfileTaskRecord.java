@@ -25,7 +25,7 @@ import lombok.Setter;
 import org.apache.skywalking.oap.server.core.Const;
 import org.apache.skywalking.oap.server.core.analysis.Stream;
 import org.apache.skywalking.oap.server.core.analysis.config.NoneStream;
-import org.apache.skywalking.oap.server.core.analysis.worker.NoneStreamingProcessor;
+import org.apache.skywalking.oap.server.core.analysis.worker.NoneStreamProcessor;
 import org.apache.skywalking.oap.server.core.source.ScopeDeclaration;
 import org.apache.skywalking.oap.server.core.storage.StorageBuilder;
 import org.apache.skywalking.oap.server.core.storage.annotation.Column;
@@ -38,7 +38,7 @@ import static org.apache.skywalking.oap.server.core.source.DefaultScopeDefine.PR
 @Getter
 @Setter
 @ScopeDeclaration(id = PROFILE_TASK, name = "ProfileTask")
-@Stream(name = ProfileTaskRecord.INDEX_NAME, scopeId = PROFILE_TASK, builder = ProfileTaskRecord.Builder.class, processor = NoneStreamingProcessor.class)
+@Stream(name = ProfileTaskRecord.INDEX_NAME, scopeId = PROFILE_TASK, builder = ProfileTaskRecord.Builder.class, processor = NoneStreamProcessor.class)
 public class ProfileTaskRecord extends NoneStream {
 
     public static final String INDEX_NAME = "profile_task";
@@ -53,11 +53,11 @@ public class ProfileTaskRecord extends NoneStream {
 
     @Override
     public String id() {
-        return getCreateTime() + Const.ID_SPLIT + getServiceId();
+        return getCreateTime() + Const.ID_CONNECTOR + getServiceId();
     }
 
     @Column(columnName = SERVICE_ID)
-    private int serviceId;
+    private String serviceId;
     @Column(columnName = ENDPOINT_NAME)
     private String endpointName;
     @Column(columnName = START_TIME)
@@ -78,7 +78,7 @@ public class ProfileTaskRecord extends NoneStream {
         @Override
         public ProfileTaskRecord map2Data(Map<String, Object> dbMap) {
             final ProfileTaskRecord record = new ProfileTaskRecord();
-            record.setServiceId(((Number) dbMap.get(SERVICE_ID)).intValue());
+            record.setServiceId((String) dbMap.get(SERVICE_ID));
             record.setEndpointName((String) dbMap.get(ENDPOINT_NAME));
             record.setStartTime(((Number) dbMap.get(START_TIME)).longValue());
             record.setDuration(((Number) dbMap.get(DURATION)).intValue());

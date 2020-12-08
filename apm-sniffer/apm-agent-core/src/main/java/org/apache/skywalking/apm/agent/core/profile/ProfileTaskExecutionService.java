@@ -32,7 +32,6 @@ import org.apache.skywalking.apm.agent.core.boot.DefaultNamedThreadFactory;
 import org.apache.skywalking.apm.agent.core.boot.ServiceManager;
 import org.apache.skywalking.apm.agent.core.context.TracingContext;
 import org.apache.skywalking.apm.agent.core.context.TracingThreadListener;
-import org.apache.skywalking.apm.agent.core.context.ids.ID;
 import org.apache.skywalking.apm.agent.core.logging.api.ILog;
 import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
 import org.apache.skywalking.apm.network.constants.ProfileConstants;
@@ -44,7 +43,7 @@ import org.apache.skywalking.apm.util.StringUtil;
 @DefaultImplementor
 public class ProfileTaskExecutionService implements BootService, TracingThreadListener {
 
-    private static final ILog logger = LogManager.getLogger(ProfileTaskExecutionService.class);
+    private static final ILog LOGGER = LogManager.getLogger(ProfileTaskExecutionService.class);
 
     // add a schedule while waiting for the task to start or finish
     private final static ScheduledExecutorService PROFILE_TASK_SCHEDULE = Executors.newSingleThreadScheduledExecutor(
@@ -75,7 +74,7 @@ public class ProfileTaskExecutionService implements BootService, TracingThreadLi
         // check profile task limit
         final CheckResult dataError = checkProfileTaskSuccess(task);
         if (!dataError.isSuccess()) {
-            logger.warn(
+            LOGGER.warn(
                 "check command error, cannot process this profile task. reason: {}", dataError.getErrorReason());
             return;
         }
@@ -91,7 +90,9 @@ public class ProfileTaskExecutionService implements BootService, TracingThreadLi
     /**
      * check and add {@link TracingContext} profiling
      */
-    public ProfileStatusReference addProfiling(TracingContext tracingContext, ID traceSegmentId, String firstSpanOPName) {
+    public ProfileStatusReference addProfiling(TracingContext tracingContext,
+                                               String traceSegmentId,
+                                               String firstSpanOPName) {
         // get current profiling task, check need profiling
         final ProfileTaskExecutionContext executionContext = taskExecutionContext.get();
         if (executionContext == null) {
@@ -104,7 +105,7 @@ public class ProfileTaskExecutionService implements BootService, TracingThreadLi
     /**
      * Re-check current trace need profiling, in case that third-party plugins change the operation name.
      */
-    public void profilingRecheck(TracingContext tracingContext, ID traceSegmentId, String firstSpanOPName) {
+    public void profilingRecheck(TracingContext tracingContext, String traceSegmentId, String firstSpanOPName) {
         // get current profiling task, check need profiling
         final ProfileTaskExecutionContext executionContext = taskExecutionContext.get();
         if (executionContext == null) {
@@ -185,7 +186,7 @@ public class ProfileTaskExecutionService implements BootService, TracingThreadLi
      */
     private CheckResult checkProfileTaskSuccess(ProfileTask task) {
         // endpoint name
-        if (StringUtil.isEmpty(task.getFistSpanOPName())) {
+        if (StringUtil.isEmpty(task.getFirstSpanOPName())) {
             return new CheckResult(false, "endpoint name cannot be empty");
         }
 
@@ -233,7 +234,7 @@ public class ProfileTaskExecutionService implements BootService, TracingThreadLi
                 return new CheckResult(
                     false,
                     "there already have processing task in time range, could not add a new task again. processing task monitor endpoint name: "
-                        + profileTask.getFistSpanOPName()
+                        + profileTask.getFirstSpanOPName()
                 );
             }
         }

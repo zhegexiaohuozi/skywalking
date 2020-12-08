@@ -25,11 +25,11 @@ import org.apache.skywalking.apm.util.StringUtil;
 import org.apache.skywalking.oap.server.core.Const;
 import org.apache.skywalking.oap.server.core.analysis.manual.log.AbstractLogRecord;
 import org.apache.skywalking.oap.server.core.analysis.record.Record;
-import org.apache.skywalking.oap.server.core.query.entity.ContentType;
-import org.apache.skywalking.oap.server.core.query.entity.Log;
-import org.apache.skywalking.oap.server.core.query.entity.LogState;
-import org.apache.skywalking.oap.server.core.query.entity.Logs;
-import org.apache.skywalking.oap.server.core.query.entity.Pagination;
+import org.apache.skywalking.oap.server.core.query.type.ContentType;
+import org.apache.skywalking.oap.server.core.query.type.Log;
+import org.apache.skywalking.oap.server.core.query.type.LogState;
+import org.apache.skywalking.oap.server.core.query.type.Logs;
+import org.apache.skywalking.oap.server.core.query.type.Pagination;
 import org.apache.skywalking.oap.server.core.storage.query.ILogQueryDAO;
 import org.apache.skywalking.oap.server.library.client.elasticsearch.ElasticSearchClient;
 import org.apache.skywalking.oap.server.library.util.BooleanUtils;
@@ -84,8 +84,9 @@ public class LogQueryEs7DAO extends EsDAO implements ILogQueryDAO {
                                 QueryBuilders.termQuery(AbstractLogRecord.IS_ERROR, BooleanUtils.booleanToValue(true)));
         } else if (LogState.SUCCESS.equals(state)) {
             boolQueryBuilder.must()
-                            .add(QueryBuilders.termQuery(AbstractLogRecord.IS_ERROR,
-                                                         BooleanUtils.booleanToValue(false)
+                            .add(QueryBuilders.termQuery(
+                                AbstractLogRecord.IS_ERROR,
+                                BooleanUtils.booleanToValue(false)
                             ));
         }
 
@@ -99,9 +100,8 @@ public class LogQueryEs7DAO extends EsDAO implements ILogQueryDAO {
 
         for (SearchHit searchHit : response.getHits().getHits()) {
             Log log = new Log();
-            log.setServiceId(((Number) searchHit.getSourceAsMap().get(AbstractLogRecord.SERVICE_ID)).intValue());
-            log.setServiceInstanceId(((Number) searchHit.getSourceAsMap()
-                                                        .get(AbstractLogRecord.SERVICE_INSTANCE_ID)).intValue());
+            log.setServiceId((String) searchHit.getSourceAsMap().get(AbstractLogRecord.SERVICE_ID));
+            log.setServiceInstanceId((String) searchHit.getSourceAsMap().get(AbstractLogRecord.SERVICE_INSTANCE_ID));
             log.setEndpointId((String) searchHit.getSourceAsMap().get(AbstractLogRecord.ENDPOINT_ID));
             log.setEndpointName((String) searchHit.getSourceAsMap().get(AbstractLogRecord.ENDPOINT_NAME));
             log.setError(BooleanUtils.valueToBoolean(((Number) searchHit.getSourceAsMap()

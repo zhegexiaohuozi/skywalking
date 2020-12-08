@@ -21,7 +21,6 @@ package org.apache.skywalking.oap.server.receiver.zipkin.handler;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.skywalking.oap.server.core.CoreModule;
-import org.apache.skywalking.oap.server.core.cache.ServiceInventoryCache;
 import org.apache.skywalking.oap.server.core.source.SourceReceiver;
 import org.apache.skywalking.oap.server.library.module.ModuleManager;
 import org.apache.skywalking.oap.server.library.server.jetty.JettyHandler;
@@ -31,15 +30,13 @@ import org.slf4j.LoggerFactory;
 import zipkin2.codec.SpanBytesDecoder;
 
 public class SpanV2JettyHandler extends JettyHandler {
-    private static final Logger logger = LoggerFactory.getLogger(SpanV2JettyHandler.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(SpanV2JettyHandler.class);
 
     private ZipkinReceiverConfig config;
     private SourceReceiver sourceReceiver;
-    private ServiceInventoryCache serviceInventoryCache;
 
     public SpanV2JettyHandler(ZipkinReceiverConfig config, ModuleManager manager) {
         sourceReceiver = manager.find(CoreModule.NAME).provider().getService(SourceReceiver.class);
-        serviceInventoryCache = manager.find(CoreModule.NAME).provider().getService(ServiceInventoryCache.class);
         this.config = config;
     }
 
@@ -60,14 +57,14 @@ public class SpanV2JettyHandler extends JettyHandler {
 
             SpanBytesDecoder decoder = SpanEncode.isProto3(encode) ? SpanBytesDecoder.PROTO3 : SpanBytesDecoder.JSON_V2;
 
-            SpanProcessor processor = new SpanProcessor(sourceReceiver, serviceInventoryCache, encode);
+            SpanProcessor processor = new SpanProcessor(sourceReceiver);
             processor.convert(config, decoder, request);
 
             response.setStatus(202);
         } catch (Exception e) {
             response.setStatus(500);
 
-            logger.error(e.getMessage(), e);
+            LOGGER.error(e.getMessage(), e);
         }
     }
 }

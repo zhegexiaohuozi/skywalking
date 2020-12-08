@@ -20,10 +20,8 @@ package org.apache.skywalking.apm.agent.core.context;
 
 import org.apache.skywalking.apm.agent.core.boot.BootService;
 import org.apache.skywalking.apm.agent.core.boot.ServiceManager;
-import org.apache.skywalking.apm.agent.core.conf.RemoteDownstreamConfig;
 import org.apache.skywalking.apm.agent.core.context.trace.AbstractSpan;
 import org.apache.skywalking.apm.agent.core.context.trace.TraceSegment;
-import org.apache.skywalking.apm.agent.core.dictionary.DictionaryUtil;
 import org.apache.skywalking.apm.agent.core.logging.api.ILog;
 import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
 import org.apache.skywalking.apm.agent.core.sampling.SamplingService;
@@ -40,7 +38,7 @@ import static org.apache.skywalking.apm.agent.core.conf.Config.Agent.OPERATION_N
  * <p> Also, {@link ContextManager} delegates to all {@link AbstractTracerContext}'s major methods.
  */
 public class ContextManager implements BootService {
-    private static final ILog logger = LogManager.getLogger(ContextManager.class);
+    private static final ILog LOGGER = LogManager.getLogger(ContextManager.class);
     private static ThreadLocal<AbstractTracerContext> CONTEXT = new ThreadLocal<AbstractTracerContext>();
     private static ThreadLocal<RuntimeContext> RUNTIME_CONTEXT = new ThreadLocal<RuntimeContext>();
     private static ContextManagerExtendService EXTEND_SERVICE;
@@ -49,23 +47,16 @@ public class ContextManager implements BootService {
         AbstractTracerContext context = CONTEXT.get();
         if (context == null) {
             if (StringUtil.isEmpty(operationName)) {
-                if (logger.isDebugEnable()) {
-                    logger.debug("No operation name, ignore this trace.");
+                if (LOGGER.isDebugEnable()) {
+                    LOGGER.debug("No operation name, ignore this trace.");
                 }
                 context = new IgnoredTracerContext();
             } else {
-                if (RemoteDownstreamConfig.Agent.SERVICE_ID != DictionaryUtil.nullValue()
-                    && RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID != DictionaryUtil.nullValue()) {
-                    if (EXTEND_SERVICE == null) {
-                        EXTEND_SERVICE = ServiceManager.INSTANCE.findService(ContextManagerExtendService.class);
-                    }
-                    context = EXTEND_SERVICE.createTraceContext(operationName, forceSampling);
-                } else {
-                    /*
-                     * Can't register to collector, no need to trace anything.
-                     */
-                    context = new IgnoredTracerContext();
+                if (EXTEND_SERVICE == null) {
+                    EXTEND_SERVICE = ServiceManager.INSTANCE.findService(ContextManagerExtendService.class);
                 }
+                context = EXTEND_SERVICE.createTraceContext(operationName, forceSampling);
+
             }
             CONTEXT.set(context);
         }
@@ -84,7 +75,7 @@ public class ContextManager implements BootService {
         if (segment == null) {
             return "N/A";
         } else {
-            return segment.getReadableGlobalTraceId();
+            return segment.getReadablePrimaryTraceId();
         }
     }
 
@@ -149,7 +140,7 @@ public class ContextManager implements BootService {
         if (snapshot == null) {
             throw new IllegalArgumentException("ContextSnapshot can't be null.");
         }
-        if (snapshot.isValid() && !snapshot.isFromCurrent()) {
+        if (!snapshot.isFromCurrent()) {
             get().continued(snapshot);
         }
     }

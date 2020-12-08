@@ -27,16 +27,17 @@ import lombok.Setter;
 import org.apache.skywalking.oap.server.core.CoreModule;
 import org.apache.skywalking.oap.server.core.UnexpectedException;
 import org.apache.skywalking.oap.server.core.analysis.DisableRegister;
-import org.apache.skywalking.oap.server.core.analysis.Downsampling;
+import org.apache.skywalking.oap.server.core.analysis.DownSampling;
 import org.apache.skywalking.oap.server.core.analysis.Stream;
 import org.apache.skywalking.oap.server.core.analysis.StreamProcessor;
 import org.apache.skywalking.oap.server.core.analysis.record.Record;
 import org.apache.skywalking.oap.server.core.analysis.topn.TopN;
 import org.apache.skywalking.oap.server.core.storage.IRecordDAO;
 import org.apache.skywalking.oap.server.core.storage.StorageDAO;
+import org.apache.skywalking.oap.server.core.storage.StorageException;
 import org.apache.skywalking.oap.server.core.storage.StorageModule;
 import org.apache.skywalking.oap.server.core.storage.annotation.Storage;
-import org.apache.skywalking.oap.server.core.storage.model.INewModel;
+import org.apache.skywalking.oap.server.core.storage.model.ModelCreator;
 import org.apache.skywalking.oap.server.core.storage.model.Model;
 import org.apache.skywalking.oap.server.library.module.ModuleDefineHolder;
 
@@ -63,7 +64,7 @@ public class TopNStreamProcessor implements StreamProcessor<TopN> {
     }
 
     @SuppressWarnings("unchecked")
-    public void create(ModuleDefineHolder moduleDefineHolder, Stream stream, Class<? extends TopN> topNClass) {
+    public void create(ModuleDefineHolder moduleDefineHolder, Stream stream, Class<? extends TopN> topNClass) throws StorageException {
         if (DisableRegister.INSTANCE.include(stream.name())) {
             return;
         }
@@ -77,10 +78,12 @@ public class TopNStreamProcessor implements StreamProcessor<TopN> {
                                                             .getSimpleName() + " top n record DAO failure.", e);
         }
 
-        INewModel modelSetter = moduleDefineHolder.find(CoreModule.NAME).provider().getService(INewModel.class);
-        Model model = modelSetter.add(topNClass, stream.scopeId(), new Storage(stream.name(), true, true, Downsampling.Second), true);
+        ModelCreator modelSetter = moduleDefineHolder.find(CoreModule.NAME).provider().getService(ModelCreator.class);
+        Model model = modelSetter.add(
+            topNClass, stream.scopeId(), new Storage(stream.name(), DownSampling.Second), true);
 
-        TopNWorker persistentWorker = new TopNWorker(moduleDefineHolder, model, topSize, topNWorkerReportCycle * 60 * 1000L, recordDAO);
+        TopNWorker persistentWorker = new TopNWorker(
+            moduleDefineHolder, model, topSize, topNWorkerReportCycle * 60 * 1000L, recordDAO);
         persistentWorkers.add(persistentWorker);
         workers.put(topNClass, persistentWorker);
     }

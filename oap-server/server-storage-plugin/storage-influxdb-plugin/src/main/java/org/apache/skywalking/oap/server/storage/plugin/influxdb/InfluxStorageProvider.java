@@ -18,32 +18,28 @@
 
 package org.apache.skywalking.oap.server.storage.plugin.influxdb;
 
-import java.util.Properties;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.skywalking.oap.server.core.CoreModule;
 import org.apache.skywalking.oap.server.core.storage.IBatchDAO;
 import org.apache.skywalking.oap.server.core.storage.IHistoryDeleteDAO;
-import org.apache.skywalking.oap.server.core.storage.IRegisterLockDAO;
 import org.apache.skywalking.oap.server.core.storage.StorageDAO;
 import org.apache.skywalking.oap.server.core.storage.StorageException;
 import org.apache.skywalking.oap.server.core.storage.StorageModule;
-import org.apache.skywalking.oap.server.core.storage.cache.INetworkAddressInventoryCacheDAO;
-import org.apache.skywalking.oap.server.core.storage.cache.IServiceInstanceInventoryCacheDAO;
-import org.apache.skywalking.oap.server.core.storage.cache.IServiceInventoryCacheDAO;
-import org.apache.skywalking.oap.server.core.storage.model.ModelInstaller;
+import org.apache.skywalking.oap.server.core.storage.cache.INetworkAddressAliasDAO;
+import org.apache.skywalking.oap.server.core.storage.management.UITemplateManagementDAO;
+import org.apache.skywalking.oap.server.core.storage.model.ModelCreator;
 import org.apache.skywalking.oap.server.core.storage.profile.IProfileTaskLogQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.profile.IProfileTaskQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.profile.IProfileThreadSnapshotQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.query.IAggregationQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.query.IAlarmQueryDAO;
+import org.apache.skywalking.oap.server.core.storage.query.IBrowserLogQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.query.ILogQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.query.IMetadataQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.query.IMetricsQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.query.ITopNRecordsQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.query.ITopologyQueryDAO;
 import org.apache.skywalking.oap.server.core.storage.query.ITraceQueryDAO;
-import org.apache.skywalking.oap.server.core.storage.ttl.GeneralStorageTTL;
-import org.apache.skywalking.oap.server.library.client.jdbc.hikaricp.JDBCHikariCPClient;
 import org.apache.skywalking.oap.server.library.module.ModuleConfig;
 import org.apache.skywalking.oap.server.library.module.ModuleDefine;
 import org.apache.skywalking.oap.server.library.module.ModuleProvider;
@@ -52,31 +48,29 @@ import org.apache.skywalking.oap.server.library.module.ServiceNotProvidedExcepti
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.base.BatchDAO;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.base.HistoryDeleteDAO;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.base.InfluxStorageDAO;
-import org.apache.skywalking.oap.server.storage.plugin.influxdb.installer.InfluxDBH2MetaDBInstaller;
-import org.apache.skywalking.oap.server.storage.plugin.influxdb.installer.InfluxDBMySQLMetaDBInstaller;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.AggregationQuery;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.AlarmQuery;
-import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.InfluxMetadataQueryDAO;
+import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.BrowserLogQuery;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.LogQuery;
+import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.MetadataQuery;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.MetricsQuery;
+import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.NetworkAddressAliasDAO;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.ProfileTaskLogQuery;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.ProfileTaskQuery;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.ProfileThreadSnapshotQuery;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.TopNRecordsQuery;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.TopologyQuery;
 import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.TraceQuery;
-import org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao.H2NetworkAddressInventoryCacheDAO;
-import org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao.H2RegisterLockDAO;
-import org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao.H2RegisterLockInstaller;
-import org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao.H2ServiceInstanceInventoryCacheDAO;
-import org.apache.skywalking.oap.server.storage.plugin.jdbc.h2.dao.H2ServiceInventoryCacheDAO;
+import org.apache.skywalking.oap.server.storage.plugin.influxdb.query.UITemplateManagementDAOImpl;
+import org.apache.skywalking.oap.server.telemetry.TelemetryModule;
+import org.apache.skywalking.oap.server.telemetry.api.HealthCheckMetrics;
+import org.apache.skywalking.oap.server.telemetry.api.MetricsCreator;
+import org.apache.skywalking.oap.server.telemetry.api.MetricsTag;
 
 @Slf4j
 public class InfluxStorageProvider extends ModuleProvider {
     private InfluxStorageConfig config;
-    private JDBCHikariCPClient client;
-    private InfluxClient influxClient;
-    private H2RegisterLockDAO lockDAO;
+    private InfluxClient client;
 
     public InfluxStorageProvider() {
         config = new InfluxStorageConfig();
@@ -99,63 +93,44 @@ public class InfluxStorageProvider extends ModuleProvider {
 
     @Override
     public void prepare() throws ServiceNotProvidedException {
+        client = new InfluxClient(config);
 
-        Properties settings;
-        if ("mysql".equalsIgnoreCase(config.getMetabaseType())) {
-            settings = config.getMysqlProps();
-        } else {
-            settings = config.getH2Props();
-        }
-        client = new JDBCHikariCPClient(settings);
-        influxClient = new InfluxClient(config);
+        this.registerServiceImplementation(IBatchDAO.class, new BatchDAO(client));
+        this.registerServiceImplementation(StorageDAO.class, new InfluxStorageDAO(client));
 
-        this.registerServiceImplementation(IBatchDAO.class, new BatchDAO(influxClient));
-        this.registerServiceImplementation(StorageDAO.class, new InfluxStorageDAO(client, influxClient));
+        this.registerServiceImplementation(INetworkAddressAliasDAO.class, new NetworkAddressAliasDAO(client));
+        this.registerServiceImplementation(IMetadataQueryDAO.class, new MetadataQuery(client));
 
-        this.lockDAO = new H2RegisterLockDAO(client);
-        this.registerServiceImplementation(IRegisterLockDAO.class, new H2RegisterLockDAO(client));
-        this.registerServiceImplementation(IServiceInventoryCacheDAO.class, new H2ServiceInventoryCacheDAO(client));
-        this.registerServiceImplementation(
-            IServiceInstanceInventoryCacheDAO.class, new H2ServiceInstanceInventoryCacheDAO(client));
-        this.registerServiceImplementation(
-            INetworkAddressInventoryCacheDAO.class, new H2NetworkAddressInventoryCacheDAO(client));
-        this.registerServiceImplementation(
-            IMetadataQueryDAO.class, new InfluxMetadataQueryDAO(influxClient, client, config.getMetadataQueryMaxSize()));
+        this.registerServiceImplementation(ITopologyQueryDAO.class, new TopologyQuery(client));
+        this.registerServiceImplementation(IMetricsQueryDAO.class, new MetricsQuery(client));
+        this.registerServiceImplementation(ITraceQueryDAO.class, new TraceQuery(client));
+        this.registerServiceImplementation(IBrowserLogQueryDAO.class, new BrowserLogQuery(client));
+        this.registerServiceImplementation(IAggregationQueryDAO.class, new AggregationQuery(client));
+        this.registerServiceImplementation(IAlarmQueryDAO.class, new AlarmQuery(client));
+        this.registerServiceImplementation(ITopNRecordsQueryDAO.class, new TopNRecordsQuery(client));
+        this.registerServiceImplementation(ILogQueryDAO.class, new LogQuery(client));
 
-        this.registerServiceImplementation(ITopologyQueryDAO.class, new TopologyQuery(influxClient));
-        this.registerServiceImplementation(IMetricsQueryDAO.class, new MetricsQuery(influxClient));
-        this.registerServiceImplementation(ITraceQueryDAO.class, new TraceQuery(influxClient));
-        this.registerServiceImplementation(IAggregationQueryDAO.class, new AggregationQuery(influxClient));
-        this.registerServiceImplementation(IAlarmQueryDAO.class, new AlarmQuery(influxClient));
-        this.registerServiceImplementation(ITopNRecordsQueryDAO.class, new TopNRecordsQuery(influxClient));
-        this.registerServiceImplementation(ILogQueryDAO.class, new LogQuery(influxClient));
-
-        this.registerServiceImplementation(IProfileTaskQueryDAO.class, new ProfileTaskQuery(influxClient));
+        this.registerServiceImplementation(IProfileTaskQueryDAO.class, new ProfileTaskQuery(client));
         this.registerServiceImplementation(
-            IProfileThreadSnapshotQueryDAO.class, new ProfileThreadSnapshotQuery(influxClient));
+            IProfileThreadSnapshotQueryDAO.class, new ProfileThreadSnapshotQuery(client));
         this.registerServiceImplementation(
-            IProfileTaskLogQueryDAO.class, new ProfileTaskLogQuery(influxClient, config.getFetchTaskLogMaxSize()));
+            IProfileTaskLogQueryDAO.class, new ProfileTaskLogQuery(client, config.getFetchTaskLogMaxSize()));
 
         this.registerServiceImplementation(
-            IHistoryDeleteDAO.class, new HistoryDeleteDAO(getManager(), influxClient, new GeneralStorageTTL()));
+            IHistoryDeleteDAO.class, new HistoryDeleteDAO(client));
+        this.registerServiceImplementation(UITemplateManagementDAO.class, new UITemplateManagementDAOImpl(client));
     }
 
     @Override
     public void start() throws ServiceNotProvidedException, ModuleStartException {
+        MetricsCreator metricCreator = getManager().find(TelemetryModule.NAME).provider().getService(MetricsCreator.class);
+        HealthCheckMetrics healthChecker = metricCreator.createHealthCheckerGauge("storage_influxdb", MetricsTag.EMPTY_KEY, MetricsTag.EMPTY_VALUE);
+        client.registerChecker(healthChecker);
         try {
             client.connect();
-            influxClient.connect();
 
-            ModelInstaller installer;
-            if (config.getMetabaseType().equalsIgnoreCase("h2")) {
-                installer = new InfluxDBH2MetaDBInstaller(getManager());
-            } else if (config.getMetabaseType().equalsIgnoreCase("mysql")) {
-                installer = new InfluxDBMySQLMetaDBInstaller(getManager());
-            } else {
-                throw new IllegalArgumentException("Unavailable metabase type, " + config.getMetabaseType());
-            }
-            installer.install(client);
-            new H2RegisterLockInstaller().install(client, lockDAO);
+            InfluxTableInstaller installer = new InfluxTableInstaller(client, getManager());
+            getManager().find(CoreModule.NAME).provider().getService(ModelCreator.class).addModelListener(installer);
         } catch (StorageException e) {
             throw new ModuleStartException(e.getMessage(), e);
         }

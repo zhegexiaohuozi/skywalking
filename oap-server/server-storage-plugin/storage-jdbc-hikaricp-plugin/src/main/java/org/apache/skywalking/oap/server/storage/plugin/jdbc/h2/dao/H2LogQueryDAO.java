@@ -28,11 +28,11 @@ import java.util.List;
 import org.apache.skywalking.apm.util.StringUtil;
 import org.apache.skywalking.oap.server.core.Const;
 import org.apache.skywalking.oap.server.core.analysis.manual.log.AbstractLogRecord;
-import org.apache.skywalking.oap.server.core.query.entity.ContentType;
-import org.apache.skywalking.oap.server.core.query.entity.Log;
-import org.apache.skywalking.oap.server.core.query.entity.LogState;
-import org.apache.skywalking.oap.server.core.query.entity.Logs;
-import org.apache.skywalking.oap.server.core.query.entity.Pagination;
+import org.apache.skywalking.oap.server.core.query.type.ContentType;
+import org.apache.skywalking.oap.server.core.query.type.Log;
+import org.apache.skywalking.oap.server.core.query.type.LogState;
+import org.apache.skywalking.oap.server.core.query.type.Logs;
+import org.apache.skywalking.oap.server.core.query.type.Pagination;
 import org.apache.skywalking.oap.server.core.storage.query.ILogQueryDAO;
 import org.apache.skywalking.oap.server.library.client.jdbc.hikaricp.JDBCHikariCPClient;
 import org.apache.skywalking.oap.server.library.util.BooleanUtils;
@@ -114,8 +114,8 @@ public class H2LogQueryDAO implements ILogQueryDAO {
                 connection, "select * " + sql.toString(), parameters.toArray(new Object[0]))) {
                 while (resultSet.next()) {
                     Log log = new Log();
-                    log.setServiceId(resultSet.getInt(SERVICE_ID));
-                    log.setServiceInstanceId(resultSet.getInt(SERVICE_INSTANCE_ID));
+                    log.setServiceId(resultSet.getString(SERVICE_ID));
+                    log.setServiceInstanceId(resultSet.getString(SERVICE_INSTANCE_ID));
                     log.setEndpointId(resultSet.getString(ENDPOINT_ID));
                     log.setEndpointName(resultSet.getString(ENDPOINT_NAME));
                     log.setTraceId(resultSet.getString(TRACE_ID));

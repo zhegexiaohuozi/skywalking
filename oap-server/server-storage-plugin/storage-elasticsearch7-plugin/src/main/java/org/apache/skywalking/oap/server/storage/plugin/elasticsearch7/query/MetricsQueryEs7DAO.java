@@ -18,13 +18,12 @@
 
 package org.apache.skywalking.oap.server.storage.plugin.elasticsearch7.query;
 
-import org.apache.skywalking.oap.server.core.analysis.Downsampling;
+import java.io.IOException;
 import org.apache.skywalking.oap.server.core.analysis.metrics.Metrics;
-import org.apache.skywalking.oap.server.core.query.entity.IntValues;
-import org.apache.skywalking.oap.server.core.query.entity.KVInt;
+import org.apache.skywalking.oap.server.core.query.input.Duration;
+import org.apache.skywalking.oap.server.core.query.input.MetricsCondition;
 import org.apache.skywalking.oap.server.core.query.sql.Function;
-import org.apache.skywalking.oap.server.core.query.sql.Where;
-import org.apache.skywalking.oap.server.core.storage.model.ModelName;
+import org.apache.skywalking.oap.server.core.storage.annotation.ValueColumnMetadata;
 import org.apache.skywalking.oap.server.library.client.elasticsearch.ElasticSearchClient;
 import org.apache.skywalking.oap.server.storage.plugin.elasticsearch.query.MetricsQueryEsDAO;
 import org.elasticsearch.action.search.SearchResponse;
@@ -35,8 +34,11 @@ import org.elasticsearch.search.aggregations.metrics.Avg;
 import org.elasticsearch.search.aggregations.metrics.Sum;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 
-import java.io.IOException;
-
+/**
+ * Duplicate logic of {@link MetricsQueryEsDAO}, but for making compatible in ElasticSearch 7.
+ *
+ * {@link Avg} and {@link Sum} have different package in the es7.
+ */
 public class MetricsQueryEs7DAO extends MetricsQueryEsDAO {
 
     public MetricsQueryEs7DAO(ElasticSearchClient client) {
@@ -44,48 +46,41 @@ public class MetricsQueryEs7DAO extends MetricsQueryEsDAO {
     }
 
     @Override
-    public IntValues getValues(String indName, Downsampling downsampling, long startTB, long endTB, Where where,
-        String valueCName, Function function) throws IOException {
-
-        String indexName = ModelName.build(downsampling, indName);
-
+    public long readMetricsValue(final MetricsCondition condition,
+                                final String valueColumnName,
+                                final Duration duration) throws IOException {
         SearchSourceBuilder sourceBuilder = SearchSourceBuilder.searchSource();
-        queryBuild(sourceBuilder, where, startTB, endTB);
+        buildQuery(sourceBuilder, condition, duration);
 
+        int defaultValue = ValueColumnMetadata.INSTANCE.getDefaultValue(condition.getName());
+        final Function function = ValueColumnMetadata.INSTANCE.getValueFunction(condition.getName());
+        if (function == Function.Latest) {
+            return readMetricsValues(condition, valueColumnName, duration).getValues().latestValue(defaultValue);
+        }
         TermsAggregationBuilder entityIdAggregation = AggregationBuilders.terms(Metrics.ENTITY_ID)
-                                                                         .field(Metrics.ENTITY_ID)
-                                                                         .size(1000);
-        functionAggregation(function, entityIdAggregation, valueCName);
+            .field(Metrics.ENTITY_ID)
+            .size(1);
+        functionAggregation(function, entityIdAggregation, valueColumnName);
 
         sourceBuilder.aggregation(entityIdAggregation);
 
-        SearchResponse response = getClient().search(indexName, sourceBuilder);
+        SearchResponse response = getClient().search(condition.getName(), sourceBuilder);
 
-        IntValues intValues = new IntValues();
         Terms idTerms = response.getAggregations().get(Metrics.ENTITY_ID);
         for (Terms.Bucket idBucket : idTerms.getBuckets()) {
-            long value;
             switch (function) {
                 case Sum:
-                    Sum sum = idBucket.getAggregations().get(valueCName);
-                    value = (long) sum.getValue();
-                    break;
+                    Sum sum = idBucket.getAggregations().get(valueColumnName);
+                    return (long) sum.getValue();
                 case Avg:
-                    Avg avg = idBucket.getAggregations().get(valueCName);
-                    value = (long) avg.getValue();
-                    break;
+                    Avg avg = idBucket.getAggregations().get(valueColumnName);
+                    return (long) avg.getValue();
                 default:
-                    avg = idBucket.getAggregations().get(valueCName);
-                    value = (long) avg.getValue();
-                    break;
+                    avg = idBucket.getAggregations().get(valueColumnName);
+                    return (long) avg.getValue();
             }
-
-            KVInt kvInt = new KVInt();
-            kvInt.setId(idBucket.getKeyAsString());
-            kvInt.setValue(value);
-            intValues.addKVInt(kvInt);
         }
-        return intValues;
+        return defaultValue;
     }
 
     protected void functionAggregation(Function function, TermsAggregationBuilder parentAggBuilder, String valueCName) {

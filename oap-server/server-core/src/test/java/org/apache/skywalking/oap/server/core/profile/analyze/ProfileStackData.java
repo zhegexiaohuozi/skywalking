@@ -20,9 +20,9 @@ package org.apache.skywalking.oap.server.core.profile.analyze;
 
 import com.google.common.base.Splitter;
 import lombok.Data;
-import org.apache.skywalking.apm.network.language.profile.ThreadStack;
+import org.apache.skywalking.apm.network.language.profile.v3.ThreadStack;
 import org.apache.skywalking.oap.server.core.profile.ProfileThreadSnapshotRecord;
-import org.apache.skywalking.oap.server.core.query.entity.ProfileAnalyzeTimeRange;
+import org.apache.skywalking.oap.server.core.query.type.ProfileAnalyzeTimeRange;
 
 import java.util.ArrayList;
 import java.util.List;

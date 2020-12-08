@@ -26,18 +26,17 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.skywalking.oap.server.core.analysis.Downsampling;
-import org.apache.skywalking.oap.server.core.analysis.metrics.IntKeyLongValue;
-import org.apache.skywalking.oap.server.core.analysis.metrics.IntKeyLongValueHashMap;
+import org.apache.skywalking.oap.server.core.analysis.metrics.DataTable;
 import org.apache.skywalking.oap.server.core.analysis.metrics.Metrics;
-import org.apache.skywalking.oap.server.core.analysis.metrics.ThermodynamicMetrics;
-import org.apache.skywalking.oap.server.core.query.entity.IntValues;
-import org.apache.skywalking.oap.server.core.query.entity.KVInt;
-import org.apache.skywalking.oap.server.core.query.entity.Thermodynamic;
+import org.apache.skywalking.oap.server.core.query.PointOfTime;
+import org.apache.skywalking.oap.server.core.query.input.Duration;
+import org.apache.skywalking.oap.server.core.query.input.MetricsCondition;
 import org.apache.skywalking.oap.server.core.query.sql.Function;
-import org.apache.skywalking.oap.server.core.query.sql.KeyValues;
-import org.apache.skywalking.oap.server.core.query.sql.Where;
-import org.apache.skywalking.oap.server.core.storage.model.ModelName;
+import org.apache.skywalking.oap.server.core.query.type.HeatMap;
+import org.apache.skywalking.oap.server.core.query.type.IntValues;
+import org.apache.skywalking.oap.server.core.query.type.KVInt;
+import org.apache.skywalking.oap.server.core.query.type.MetricsValues;
+import org.apache.skywalking.oap.server.core.storage.annotation.ValueColumnMetadata;
 import org.apache.skywalking.oap.server.core.storage.query.IMetricsQueryDAO;
 import org.apache.skywalking.oap.server.library.client.jdbc.hikaricp.JDBCHikariCPClient;
 
@@ -50,11 +49,14 @@ public class H2MetricsQueryDAO extends H2SQLExecutor implements IMetricsQueryDAO
     }
 
     @Override
-    public IntValues getValues(String indName, Downsampling downsampling, long startTB, long endTB, Where where,
-        String valueCName, Function function) throws IOException {
-        String tableName = ModelName.build(downsampling, indName);
-
-        List<KeyValues> whereKeyValues = where.getKeyValues();
+    public long readMetricsValue(final MetricsCondition condition,
+                                String valueColumnName,
+                                final Duration duration) throws IOException {
+        int defaultValue = ValueColumnMetadata.INSTANCE.getDefaultValue(condition.getName());
+        final Function function = ValueColumnMetadata.INSTANCE.getValueFunction(condition.getName());
+        if (function == Function.Latest) {
+            return readMetricsValues(condition, valueColumnName, duration).getValues().latestValue(defaultValue);
+        }
         String op;
         switch (function) {
             case Avg:
@@ -63,206 +65,165 @@ public class H2MetricsQueryDAO extends H2SQLExecutor implements IMetricsQueryDAO
             default:
                 op = "sum";
         }
-        List<String> ids = new ArrayList<>(20);
-        StringBuilder whereSql = new StringBuilder();
-        if (whereKeyValues.size() > 0) {
-            whereSql.append("(");
-            for (int i = 0; i < whereKeyValues.size(); i++) {
-                if (i != 0) {
-                    whereSql.append(" or ");
-                }
-                KeyValues keyValues = whereKeyValues.get(i);
-
-                StringBuilder valueCollection = new StringBuilder();
-                List<String> values = keyValues.getValues();
-                for (int valueIdx = 0; valueIdx < values.size(); valueIdx++) {
-                    if (valueIdx != 0) {
-                        valueCollection.append(",");
-                    }
-                    String id = values.get(valueIdx);
-                    ids.add(id);
-                    valueCollection.append("'").append(id).append("'");
-                }
-                whereSql.append(keyValues.getKey()).append(" in (").append(valueCollection).append(")");
-            }
-            whereSql.append(") and ");
+        StringBuilder sql = new StringBuilder(
+            "select " + Metrics.ENTITY_ID + " id, " + op + "(" + valueColumnName + ") value from " + condition.getName() + " where ");
+        final String entityId = condition.getEntity().buildId();
+        List<Object> parameters = new ArrayList();
+        if (entityId != null) {
+            sql.append(Metrics.ENTITY_ID + " = ? and ");
+            parameters.add(entityId);
         }
+        sql.append(Metrics.TIME_BUCKET + ">= ? and " + Metrics.TIME_BUCKET + "<=?" + " group by " + Metrics.ENTITY_ID);
+        parameters.add(duration.getStartTimeBucket());
+        parameters.add(duration.getEndTimeBucket());
 
-        IntValues intValues = new IntValues();
         try (Connection connection = h2Client.getConnection()) {
-            try (ResultSet resultSet = h2Client.executeQuery(connection, "select " + Metrics.ENTITY_ID + " id, " + op + "(" + valueCName + ") value from " + tableName + " where " + whereSql + Metrics.TIME_BUCKET + ">= ? and " + Metrics.TIME_BUCKET + "<=?" + " group by " + Metrics.ENTITY_ID, startTB, endTB)) {
-
+            try (ResultSet resultSet = h2Client.executeQuery(
+                connection,
+                sql.toString(),
+                parameters.toArray(new Object[0])
+            )) {
                 while (resultSet.next()) {
-                    KVInt kv = new KVInt();
-                    kv.setId(resultSet.getString("id"));
-                    kv.setValue(resultSet.getLong("value"));
-                    intValues.addKVInt(kv);
+                    return resultSet.getLong("value");
                 }
             }
         } catch (SQLException e) {
             throw new IOException(e);
         }
-        return orderWithDefault0(intValues, ids);
+        return defaultValue;
     }
 
     @Override
-    public IntValues getLinearIntValues(String indName, Downsampling downsampling, List<String> ids,
-        String valueCName) throws IOException {
-        String tableName = ModelName.build(downsampling, indName);
-
-        StringBuilder idValues = new StringBuilder();
-        for (int valueIdx = 0; valueIdx < ids.size(); valueIdx++) {
-            if (valueIdx != 0) {
-                idValues.append(",");
-            }
-            idValues.append("'").append(ids.get(valueIdx)).append("'");
-        }
-
-        IntValues intValues = new IntValues();
-
-        try (Connection connection = h2Client.getConnection()) {
-            try (ResultSet resultSet = h2Client.executeQuery(connection, "select id, " + valueCName + " from " + tableName + " where id in (" + idValues
-                .toString() + ")")) {
-                while (resultSet.next()) {
-                    KVInt kv = new KVInt();
-                    kv.setId(resultSet.getString("id"));
-                    kv.setValue(resultSet.getLong(valueCName));
-                    intValues.addKVInt(kv);
-                }
-            }
-        } catch (SQLException e) {
-            throw new IOException(e);
-        }
-
-        return orderWithDefault0(intValues, ids);
-    }
-
-    @Override
-    public IntValues[] getMultipleLinearIntValues(String indName, Downsampling downsampling, List<String> ids,
-        final List<Integer> linearIndex, String valueCName) throws IOException {
-        String tableName = ModelName.build(downsampling, indName);
-
-        StringBuilder idValues = new StringBuilder();
-        for (int valueIdx = 0; valueIdx < ids.size(); valueIdx++) {
-            if (valueIdx != 0) {
-                idValues.append(",");
-            }
-            idValues.append("'").append(ids.get(valueIdx)).append("'");
-        }
-
-        IntValues[] intValuesArray = new IntValues[linearIndex.size()];
-        for (int i = 0; i < intValuesArray.length; i++) {
-            intValuesArray[i] = new IntValues();
-        }
-
-        try (Connection connection = h2Client.getConnection()) {
-            try (ResultSet resultSet = h2Client.executeQuery(connection, "select id, " + valueCName + " from " + tableName + " where id in (" + idValues
-                .toString() + ")")) {
-                while (resultSet.next()) {
-                    String id = resultSet.getString("id");
-
-                    IntKeyLongValueHashMap multipleValues = new IntKeyLongValueHashMap(5);
-                    multipleValues.toObject(resultSet.getString(valueCName));
-
-                    for (int i = 0; i < linearIndex.size(); i++) {
-                        Integer index = linearIndex.get(i);
-                        KVInt kv = new KVInt();
-                        kv.setId(id);
-                        kv.setValue(multipleValues.get(index).getValue());
-                        intValuesArray[i].addKVInt(kv);
-                    }
-                }
-            }
-        } catch (SQLException e) {
-            throw new IOException(e);
-        }
-
-        return orderWithDefault0(intValuesArray, ids);
-    }
-
-    /**
-     * Make sure the order is same as the expected order, and keep default value as 0.
-     */
-    private IntValues orderWithDefault0(IntValues origin, List<String> expectedOrder) {
-        IntValues intValues = new IntValues();
-
-        expectedOrder.forEach(id -> {
-            KVInt e = new KVInt();
-            e.setId(id);
-            e.setValue(origin.findValue(id, 0));
-            intValues.addKVInt(e);
+    public MetricsValues readMetricsValues(final MetricsCondition condition,
+                                           final String valueColumnName,
+                                           final Duration duration) throws IOException {
+        final List<PointOfTime> pointOfTimes = duration.assembleDurationPoints();
+        List<String> ids = new ArrayList<>(pointOfTimes.size());
+        pointOfTimes.forEach(pointOfTime -> {
+            ids.add(pointOfTime.id(condition.getEntity().buildId()));
         });
 
-        return intValues;
-    }
-
-    /**
-     * Make sure the order is same as the expected order, and keep default value as 0.
-     */
-    private IntValues[] orderWithDefault0(IntValues[] origin, List<String> expectedOrder) {
-        for (int i = 0; i < origin.length; i++) {
-            origin[i] = orderWithDefault0(origin[i], expectedOrder);
+        StringBuilder sql = new StringBuilder(
+            "select id, " + valueColumnName + " from " + condition.getName() + " where id in (");
+        List<Object> parameters = new ArrayList();
+        for (int i = 0; i < ids.size(); i++) {
+            if (i == 0) {
+                sql.append("?");
+            } else {
+                sql.append(",?");
+            }
+            parameters.add(ids.get(i));
         }
-        return origin;
+        sql.append(")");
+
+        MetricsValues metricsValues = new MetricsValues();
+        // Label is null, because in readMetricsValues, no label parameter.
+        final IntValues intValues = metricsValues.getValues();
+
+        try (Connection connection = h2Client.getConnection()) {
+
+            try (ResultSet resultSet = h2Client.executeQuery(
+                connection, sql.toString(), parameters.toArray(new Object[0]))) {
+                while (resultSet.next()) {
+                    KVInt kv = new KVInt();
+                    kv.setId(resultSet.getString("id"));
+                    kv.setValue(resultSet.getLong(valueColumnName));
+                    intValues.addKVInt(kv);
+                }
+            }
+        } catch (SQLException e) {
+            throw new IOException(e);
+        }
+
+        metricsValues.setValues(
+            Util.sortValues(intValues, ids, ValueColumnMetadata.INSTANCE.getDefaultValue(condition.getName()))
+        );
+        return metricsValues;
     }
 
     @Override
-    public Thermodynamic getThermodynamic(String indName, Downsampling downsampling, List<String> ids,
-        String valueCName) throws IOException {
-        String tableName = ModelName.build(downsampling, indName);
+    public List<MetricsValues> readLabeledMetricsValues(final MetricsCondition condition,
+                                                        final String valueColumnName,
+                                                        final List<String> labels,
+                                                        final Duration duration) throws IOException {
+        final List<PointOfTime> pointOfTimes = duration.assembleDurationPoints();
+        List<String> ids = new ArrayList<>(pointOfTimes.size());
+        pointOfTimes.forEach(pointOfTime -> {
+            ids.add(pointOfTime.id(condition.getEntity().buildId()));
+        });
 
-        StringBuilder idValues = new StringBuilder();
-        for (int valueIdx = 0; valueIdx < ids.size(); valueIdx++) {
-            if (valueIdx != 0) {
-                idValues.append(",");
+        StringBuilder sql = new StringBuilder(
+            "select id, " + valueColumnName + " from " + condition.getName() + " where id in (");
+
+        List<Object> parameters = new ArrayList();
+        for (int i = 0; i < ids.size(); i++) {
+            if (i == 0) {
+                sql.append("?");
+            } else {
+                sql.append(",?");
             }
-            idValues.append("'").append(ids.get(valueIdx)).append("'");
+            parameters.add(ids.get(i));
         }
+        sql.append(")");
 
-        List<List<Long>> thermodynamicValueCollection = new ArrayList<>();
-        Map<String, List<Long>> thermodynamicValueMatrix = new HashMap<>();
+        Map<String, DataTable> idMap = new HashMap<>();
+        try (Connection connection = h2Client.getConnection()) {
+            try (ResultSet resultSet = h2Client.executeQuery(
+                connection, sql.toString(), parameters.toArray(new Object[0]))) {
+                while (resultSet.next()) {
+                    String id = resultSet.getString("id");
+
+                    DataTable multipleValues = new DataTable(5);
+                    multipleValues.toObject(resultSet.getString(valueColumnName));
+
+                   idMap.put(id, multipleValues);
+                }
+            }
+        } catch (SQLException e) {
+            throw new IOException(e);
+        }
+        return Util.composeLabelValue(condition, labels, ids, idMap);
+    }
+
+    @Override
+    public HeatMap readHeatMap(final MetricsCondition condition,
+                               final String valueColumnName,
+                               final Duration duration) throws IOException {
+        final List<PointOfTime> pointOfTimes = duration.assembleDurationPoints();
+        List<String> ids = new ArrayList<>(pointOfTimes.size());
+        pointOfTimes.forEach(pointOfTime -> {
+            ids.add(pointOfTime.id(condition.getEntity().buildId()));
+        });
+
+        StringBuilder sql = new StringBuilder(
+            "select id, " + valueColumnName + " dataset, id from " + condition.getName() + " where id in (");
+        List<Object> parameters = new ArrayList();
+        for (int i = 0; i < ids.size(); i++) {
+            if (i == 0) {
+                sql.append("?");
+            } else {
+                sql.append(",?");
+            }
+            parameters.add(ids.get(i));
+        }
+        sql.append(")");
+
+        final int defaultValue = ValueColumnMetadata.INSTANCE.getDefaultValue(condition.getName());
 
         try (Connection connection = h2Client.getConnection()) {
-            Thermodynamic thermodynamic = new Thermodynamic();
-            int numOfSteps = 0;
-            int axisYStep = 0;
-            try (ResultSet resultSet = h2Client.executeQuery(connection, "select " + ThermodynamicMetrics.STEP + " step, " + ThermodynamicMetrics.NUM_OF_STEPS + " num_of_steps, " + ThermodynamicMetrics.DETAIL_GROUP + " detail_group, " + "id " + " from " + tableName + " where id in (" + idValues
-                .toString() + ")")) {
+            HeatMap heatMap = new HeatMap();
+            try (ResultSet resultSet = h2Client.executeQuery(
+                connection, sql.toString(), parameters.toArray(new Object[0]))) {
 
                 while (resultSet.next()) {
-                    axisYStep = resultSet.getInt("step");
-                    String id = resultSet.getString("id");
-                    numOfSteps = resultSet.getInt("num_of_steps") + 1;
-                    String value = resultSet.getString("detail_group");
-                    IntKeyLongValueHashMap intKeyLongValues = new IntKeyLongValueHashMap(5);
-                    intKeyLongValues.toObject(value);
-
-                    List<Long> axisYValues = new ArrayList<>();
-                    for (int i = 0; i < numOfSteps; i++) {
-                        axisYValues.add(0L);
-                    }
-
-                    for (IntKeyLongValue intKeyLongValue : intKeyLongValues.values()) {
-                        axisYValues.set(intKeyLongValue.getKey(), intKeyLongValue.getValue());
-                    }
-
-                    thermodynamicValueMatrix.put(id, axisYValues);
+                    heatMap.buildColumn(
+                        resultSet.getString("id"), resultSet.getString("dataset"), defaultValue);
                 }
-
-                // try to add default values when there is no data in that time bucket.
-                ids.forEach(id -> {
-                    if (thermodynamicValueMatrix.containsKey(id)) {
-                        thermodynamicValueCollection.add(thermodynamicValueMatrix.get(id));
-                    } else {
-                        thermodynamicValueCollection.add(new ArrayList<>());
-                    }
-                });
             }
 
-            thermodynamic.fromMatrixData(thermodynamicValueCollection, numOfSteps);
-            thermodynamic.setAxisYStep(axisYStep);
+            heatMap.fixMissingColumns(ids, defaultValue);
 
-            return thermodynamic;
+            return heatMap;
         } catch (SQLException e) {
             throw new IOException(e);
         }

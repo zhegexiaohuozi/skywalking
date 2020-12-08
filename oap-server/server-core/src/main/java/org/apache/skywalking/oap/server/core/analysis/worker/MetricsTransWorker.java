@@ -22,10 +22,6 @@ import java.util.Objects;
 import org.apache.skywalking.oap.server.core.analysis.metrics.Metrics;
 import org.apache.skywalking.oap.server.core.worker.AbstractWorker;
 import org.apache.skywalking.oap.server.library.module.ModuleDefineHolder;
-import org.apache.skywalking.oap.server.telemetry.TelemetryModule;
-import org.apache.skywalking.oap.server.telemetry.api.CounterMetrics;
-import org.apache.skywalking.oap.server.telemetry.api.MetricsCreator;
-import org.apache.skywalking.oap.server.telemetry.api.MetricsTag;
 
 /**
  * MetricsTransWorker is transferring the metrics for downsampling. All streaming process metrics are in the minute
@@ -35,57 +31,27 @@ import org.apache.skywalking.oap.server.telemetry.api.MetricsTag;
 public class MetricsTransWorker extends AbstractWorker<Metrics> {
     private final MetricsPersistentWorker hourPersistenceWorker;
     private final MetricsPersistentWorker dayPersistenceWorker;
-    private final MetricsPersistentWorker monthPersistenceWorker;
-
-    private final CounterMetrics aggregationHourCounter;
-    private final CounterMetrics aggregationDayCounter;
-    private final CounterMetrics aggregationMonthCounter;
 
     public MetricsTransWorker(ModuleDefineHolder moduleDefineHolder,
-                              String modelName,
                               MetricsPersistentWorker hourPersistenceWorker,
-                              MetricsPersistentWorker dayPersistenceWorker,
-                              MetricsPersistentWorker monthPersistenceWorker) {
+                              MetricsPersistentWorker dayPersistenceWorker) {
         super(moduleDefineHolder);
         this.hourPersistenceWorker = hourPersistenceWorker;
         this.dayPersistenceWorker = dayPersistenceWorker;
-        this.monthPersistenceWorker = monthPersistenceWorker;
-
-        MetricsCreator metricsCreator = moduleDefineHolder.find(TelemetryModule.NAME)
-                                                          .provider()
-                                                          .getService(MetricsCreator.class);
-        aggregationHourCounter = metricsCreator.createCounter(
-            "metrics_aggregation", "The number of rows in aggregation", new MetricsTag.Keys("metricName", "level",
-                                                                                            "dimensionality"
-            ), new MetricsTag.Values(modelName, "2", "hour"));
-        aggregationDayCounter = metricsCreator.createCounter(
-            "metrics_aggregation", "The number of rows in aggregation", new MetricsTag.Keys("metricName", "level",
-                                                                                            "dimensionality"
-            ), new MetricsTag.Values(modelName, "2", "day"));
-        aggregationMonthCounter = metricsCreator.createCounter(
-            "metrics_aggregation", "The number of rows in aggregation", new MetricsTag.Keys("metricName", "level",
-                                                                                            "dimensionality"
-            ), new MetricsTag.Values(modelName, "2", "month"));
     }
 
     /**
-     * Use the {@link Metrics#toHour()}, {@link Metrics#toDay()} and {@link Metrics#toMonth()} to clone a new metrics
-     * instance then process the downsampling. Then forward the data to different works of different precisions for
-     * another round aggregation/merging.
+     * Use the {@link Metrics#toHour()} and {@link Metrics#toDay()}to clone a new metrics instance then process the
+     * downsampling. Then forward the data to different works of different precisions for another round
+     * aggregation/merging.
      */
     @Override
     public void in(Metrics metrics) {
         if (Objects.nonNull(hourPersistenceWorker)) {
-            aggregationMonthCounter.inc();
             hourPersistenceWorker.in(metrics.toHour());
         }
         if (Objects.nonNull(dayPersistenceWorker)) {
-            aggregationDayCounter.inc();
             dayPersistenceWorker.in(metrics.toDay());
-        }
-        if (Objects.nonNull(monthPersistenceWorker)) {
-            aggregationHourCounter.inc();
-            monthPersistenceWorker.in(metrics.toMonth());
         }
     }
 }

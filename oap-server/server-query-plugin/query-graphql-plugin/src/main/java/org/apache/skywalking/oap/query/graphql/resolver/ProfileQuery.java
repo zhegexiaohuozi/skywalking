@@ -21,11 +21,11 @@ package org.apache.skywalking.oap.query.graphql.resolver;
 import com.coxautodev.graphql.tools.GraphQLQueryResolver;
 import org.apache.skywalking.oap.server.core.CoreModule;
 import org.apache.skywalking.oap.server.core.query.ProfileTaskQueryService;
-import org.apache.skywalking.oap.server.core.query.entity.BasicTrace;
-import org.apache.skywalking.oap.server.core.query.entity.ProfileAnalyzation;
-import org.apache.skywalking.oap.server.core.query.entity.ProfileAnalyzeTimeRange;
-import org.apache.skywalking.oap.server.core.query.entity.ProfileTask;
-import org.apache.skywalking.oap.server.core.query.entity.ProfiledSegment;
+import org.apache.skywalking.oap.server.core.query.type.BasicTrace;
+import org.apache.skywalking.oap.server.core.query.type.ProfileAnalyzation;
+import org.apache.skywalking.oap.server.core.query.type.ProfileAnalyzeTimeRange;
+import org.apache.skywalking.oap.server.core.query.type.ProfileTask;
+import org.apache.skywalking.oap.server.core.query.type.ProfiledSegment;
 import org.apache.skywalking.oap.server.library.module.ModuleManager;
 
 import java.io.IOException;
@@ -52,7 +52,7 @@ public class ProfileQuery implements GraphQLQueryResolver {
         return profileTaskQueryService;
     }
 
-    public List<ProfileTask> getProfileTaskList(final Integer serviceId, final String endpointName) throws IOException {
+    public List<ProfileTask> getProfileTaskList(final String serviceId, final String endpointName) throws IOException {
         return getProfileTaskQueryService().getTaskList(serviceId, endpointName);
     }
 
