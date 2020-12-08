@@ -185,4 +185,11 @@ public class ComponentsDefine {
 
     public static final OfficialComponent THRIFT_CLIENT = new OfficialComponent(101, "thrift-client");
 
+    public static final OfficialComponent ASYNC_HTTP_CLIENT = new OfficialComponent(102, "AsyncHttpClient");
+
+    public static final OfficialComponent DBCP = new OfficialComponent(103, "dbcp");
+
+    public static final OfficialComponent MSSQL_JDBC_DRIVER = new OfficialComponent(104, "mssql-jdbc-driver");
+
+    public static final OfficialComponent APACHE_CXF = new OfficialComponent(105, "Apache-CXF");
 }

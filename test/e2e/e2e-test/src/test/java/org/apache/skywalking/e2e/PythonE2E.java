@@ -58,11 +58,14 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.apache.skywalking.e2e.metrics.MetricsMatcher.verifyMetrics;
+import static org.apache.skywalking.e2e.metrics.MetricsMatcher.verifyPercentileMetrics;
 import static org.apache.skywalking.e2e.metrics.MetricsQuery.ALL_ENDPOINT_METRICS;
+import static org.apache.skywalking.e2e.metrics.MetricsQuery.ALL_ENDPOINT_MULTIPLE_LINEAR_METRICS;
 import static org.apache.skywalking.e2e.metrics.MetricsQuery.ALL_INSTANCE_METRICS;
 import static org.apache.skywalking.e2e.metrics.MetricsQuery.ALL_SERVICE_INSTANCE_RELATION_CLIENT_METRICS;
 import static org.apache.skywalking.e2e.metrics.MetricsQuery.ALL_SERVICE_INSTANCE_RELATION_SERVER_METRICS;
 import static org.apache.skywalking.e2e.metrics.MetricsQuery.ALL_SERVICE_METRICS;
+import static org.apache.skywalking.e2e.metrics.MetricsQuery.ALL_SERVICE_MULTIPLE_LINEAR_METRICS;
 import static org.apache.skywalking.e2e.metrics.MetricsQuery.ALL_SERVICE_RELATION_CLIENT_METRICS;
 import static org.apache.skywalking.e2e.metrics.MetricsQuery.ALL_SERVICE_RELATION_SERVER_METRICS;
 import static org.apache.skywalking.e2e.utils.Times.now;
@@ -98,7 +101,7 @@ public class PythonE2E extends SkyWalkingTestAdapter {
     @RetryableTest
     void services() throws Exception {
         List<Service> services = graphql.services(new ServicesQuery().start(startTime).end(now()));
-        services = services.stream().filter(s -> !s.getLabel().equals("oap-server")).collect(Collectors.toList());
+        services = services.stream().filter(s -> !s.getLabel().equals("oap::oap-server")).collect(Collectors.toList());
         LOGGER.info("services: {}", services);
 
         load("expected/python/services.yml").as(ServicesMatcher.class).verify(services);
@@ -224,6 +227,9 @@ public class PythonE2E extends SkyWalkingTestAdapter {
 
                 LOGGER.info("{}: {}", metricName, metrics);
             }
+            for (String metricName : ALL_ENDPOINT_MULTIPLE_LINEAR_METRICS) {
+                verifyPercentileMetrics(graphql, metricName, endpoint.getKey(), startTime);
+            }
         }
     }
 
@@ -240,6 +246,10 @@ public class PythonE2E extends SkyWalkingTestAdapter {
             instanceRespTimeMatcher.setValue(greaterThanZero);
             instanceRespTimeMatcher.verify(serviceMetrics);
             LOGGER.info("{}: {}", metricName, serviceMetrics);
+        }
+
+        for (String metricName : ALL_SERVICE_MULTIPLE_LINEAR_METRICS) {
+            verifyPercentileMetrics(graphql, metricName, service.getKey(), startTime);
         }
     }
 

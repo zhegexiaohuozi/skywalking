@@ -72,15 +72,19 @@ public class InfluxClient implements Client, HealthCheckable {
     @Override
     public void connect() {
         try {
+            InfluxDB.ResponseFormat responseFormat = InfluxDB.ResponseFormat.valueOf(config.getConnectionResponseFormat());
             influx = InfluxDBFactory.connect(config.getUrl(), config.getUser(), config.getPassword(),
                     new OkHttpClient.Builder().readTimeout(3, TimeUnit.MINUTES)
                             .writeTimeout(3, TimeUnit.MINUTES),
-                    InfluxDB.ResponseFormat.MSGPACK
+                    responseFormat
             );
             influx.query(new Query("CREATE DATABASE " + database));
             influx.enableGzip();
 
-            influx.enableBatch(config.getActions(), config.getDuration(), TimeUnit.MILLISECONDS);
+            if (config.isBatchEnabled()) {
+                influx.enableBatch(config.getActions(), config.getDuration(), TimeUnit.MILLISECONDS);
+            }
+
             influx.setDatabase(database);
             healthChecker.health();
         } catch (Throwable e) {
